@@ -1,0 +1,52 @@
+{
+  "name": "coder",
+  "version": "0.6.0",
+  "private": true,
+  "description": "DSH 插件 coder：三个工具——coder_codes 从仓库文档提炼诊断码（落在 docs/codes.jsonl，有就复用），coder_debug 复用这份码按作用范围插桩、跑一次收集运行期诊断并交付 tsc 风格的诊断列表，coder_triage 把「发起排查」得出的解决方案写进这次运行目录。外加一个叫 Coder 的主界面页面（React + antd），页内四个 Tab：设计（宿主侧无头 Chrome 里的飞书设计文档，弹窗内部消化、浏览记录自动恢复）、诊断码（编辑那份文件）、诊断报告（只读最新一次，按诊断码分类，可一键发起排查）、解决方案（排掉误报后的真问题，勾选后发起正式解决）。运行期零依赖（antd 打进 client.js；无头浏览器用系统装的 Chrome/Edge）。",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.mjs",
+    "client.js",
+    "src",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:client": "node scripts/build-client.mjs",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "check": "node --check index.mjs && node --check client.js && node --check src/flow.mjs && node --check src/codes-flow.mjs && node --check src/git.mjs && node --check src/codes.mjs && node --check src/codes-files.mjs && node --check src/web.mjs && node --check src/reports.mjs && node --check src/jobs.mjs && node --check src/solutions.mjs && node --check src/browser.mjs && node --check src/codes-client.js && node --check src/program.mjs && node --check src/runner.mjs && node --check src/prompts.mjs && node --check src/report.mjs && node --check src/tools/index.mjs && node --check src/tools/codes.mjs && node --check src/tools/debug.mjs && node --check src/tools/job.mjs && node --check src/tools/triage.mjs && node scripts/build-client.mjs --check"
+  },
+  "devDependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "antd": "^6.7.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}

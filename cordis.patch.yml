@@ -1,0 +1,8 @@
+- insert:
+    - id: coder
+      name: coder
+      config:
+        outDir: .coder
+        runTimeoutMs: 60000
+        subagentProvider: auto
+        cleanup: true

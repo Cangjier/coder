@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Code Debug",
+    "description": "Derives diagnostic codes from a repository's normative documentation, instruments one commit with runtime logging, runs it once, and delivers a tsc-style diagnostic list; the Diagnostic codes page in the left sidebar edits codes.jsonl in place."
+  }
+}
