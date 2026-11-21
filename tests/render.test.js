@@ -102,6 +102,19 @@ describe('renderDesign', () => {
     assert.match(html, /\.coder\/design\/file\.md/)
     assert.match(html, /\.coder\/design\/data_structure\.md/)
     assert.match(html, /interface Diagnostic/)
+    assert.match(html, /doc-fallback/)
+    assert.match(html, /href="#architecture"/)
+  })
+
+  it('脚本被禁用时正文仍然可读', async () => {
+    const root = writeProject()
+    const result = await renderDesign({ root })
+    const html = readFileSync(result.output, 'utf8')
+    const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/g, '')
+    assert.match(withoutScripts, /<pre># 架构/)
+    assert.match(withoutScripts, /interface Diagnostic/)
+    assert.match(withoutScripts, /href="#file"/)
+    assert.match(withoutScripts, /doc-fallback/)
   })
 
   it('同样的文档生成同样的 HTML', async () => {

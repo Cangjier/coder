@@ -54,7 +54,7 @@ Coder 是一个 DSH Host 插件，提供五个确定性工具：
 
 默认写入 `dist/.coder/design.html`。`out` 可以指定另一个输出目录，文件名固定为 `design.html`。
 
-页面内嵌四份文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，左侧是目录。页面不显示额外的状态或提示文案。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载；离线时回退为 Markdown 源码。
+页面内嵌四份文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，左侧是目录。页面不显示额外的状态或提示文案。服务端先写入四份文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
 
 ## lock / unlock
 

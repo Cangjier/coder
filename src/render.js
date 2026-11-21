@@ -10,7 +10,8 @@
  * - 不显示状态卡、页脚、说明文案或回退提示。
  *
  * Markdown 由 `marked` 渲染，Mermaid 由 `mermaid` 渲染，两者从 jsDelivr
- * 加载；CDN 不可用时 Markdown 回退为源码，Mermaid 代码块保持源码。
+ * 加载。页面在服务端预置四份文档的源码：脚本不可用时它就是可读的正文；
+ * 脚本可用时升级为树表格 / Markdown / Mermaid。CDN 不可用时保留源码。
  *
  * 这里不生成时间戳，也不读环境信息：同样的文档永远得到同样的 HTML。
  *
@@ -27,6 +28,56 @@ export const DEFAULT_OUT_DIR = 'dist/.coder'
 
 /** 输出文件名。 */
 export const OUTPUT_FILE = 'design.html'
+
+/**
+ * 转义为可以放进 `<pre>` 的文本。
+ *
+ * @param {string} value - 原文。
+ * @returns {string} HTML 文本。
+ */
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character])
+}
+
+/**
+ * 服务端预置的文档区块。
+ *
+ * 脚本不可用时，这就是页面正文：四份文档以纯文本呈现，至少可读；
+ * 脚本可用时，前端把它替换成树表格 / Markdown / Mermaid。
+ *
+ * @param {{path: string, kind: string, present: boolean, content: string}[]} docs - 四份文档。
+ * @returns {string} 文档区块的 HTML。
+ */
+function renderFallbackSections(docs) {
+  return docs.map((doc) => {
+    const body = doc.present
+      ? `<div class="markdown doc-fallback"><pre>${escapeHtml(doc.content)}</pre></div>`
+      : '<div class="doc-missing"></div>'
+    return `<section class="doc" id="${escapeHtml(doc.kind)}" data-doc="${escapeHtml(doc.kind)}">
+  <h2>${escapeHtml(doc.path)}</h2>
+  ${body}
+</section>`
+  }).join('\n')
+}
+
+/**
+ * 服务端预置的目录，只列四份文档；前端会在此基础上补文档内标题。
+ *
+ * @param {{path: string, kind: string}[]} docs - 四份文档。
+ * @returns {string} 目录的 HTML。
+ */
+function renderStaticNav(docs) {
+  const items = docs
+    .map((doc) => `    <li><a href="#${escapeHtml(doc.kind)}">${escapeHtml(doc.path)}</a></li>`)
+    .join('\n')
+  return `<ul class="toc">\n${items}\n  </ul>`
+}
 
 /**
  * 构造单页 HTML。
@@ -279,9 +330,13 @@ a:hover { text-decoration: underline; }
 <div class="layout">
   <aside class="sidebar">
     <p class="nav-title">目录</p>
-    <nav id="nav" aria-label="目录"></nav>
+    <nav id="nav" aria-label="目录">
+  ${renderStaticNav(docs)}
+    </nav>
   </aside>
-  <main id="content"></main>
+  <main id="content">
+${renderFallbackSections(docs)}
+  </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
@@ -290,7 +345,6 @@ a:hover { text-decoration: underline; }
 (function () {
   'use strict'
   var data = JSON.parse(document.getElementById('coder-data').textContent)
-  var content = document.getElementById('content')
   var nav = document.getElementById('nav')
   var hasMarked = typeof window.marked !== 'undefined'
   var hasMermaid = typeof window.mermaid !== 'undefined'
@@ -489,34 +543,25 @@ a:hover { text-decoration: underline; }
   }
 
   data.docs.forEach(function (doc) {
-    var section = document.createElement('section')
-    section.className = 'doc'
-    section.id = doc.kind
-    var title = document.createElement('h2')
-    title.textContent = doc.path
-    section.appendChild(title)
-
-    if (!doc.present) {
-      var missing = document.createElement('div')
-      missing.className = 'doc-missing'
-      section.appendChild(missing)
-    } else if (doc.kind === 'file') {
-      section.appendChild(renderFileTree(doc.content))
-    } else {
-      var body = document.createElement('div')
-      body.className = 'markdown'
-      if (hasMarked) {
-        try {
-          body.innerHTML = window.marked.parse(doc.content, { gfm: true })
-        } catch (error) {
-          body.innerHTML = '<pre>' + escapeHtml(doc.content) + '</pre>'
-        }
-      } else {
-        body.innerHTML = '<pre>' + escapeHtml(doc.content) + '</pre>'
-      }
-      section.appendChild(body)
+    var section = document.getElementById(doc.kind)
+    if (section === null || !doc.present) return
+    var fallback = section.querySelector('.doc-fallback')
+    if (doc.kind === 'file') {
+      var tree = renderFileTree(doc.content)
+      if (fallback !== null) section.replaceChild(tree, fallback)
+      else section.appendChild(tree)
+      return
     }
-    content.appendChild(section)
+    if (!hasMarked) return
+    var body = document.createElement('div')
+    body.className = 'markdown'
+    try {
+      body.innerHTML = window.marked.parse(doc.content, { gfm: true })
+    } catch (error) {
+      return
+    }
+    if (fallback !== null) section.replaceChild(body, fallback)
+    else section.appendChild(body)
   })
 
   function jumpTo(id) {
@@ -546,6 +591,8 @@ a:hover { text-decoration: underline; }
       if (jumpTo(id)) event.preventDefault()
     })
   }
+
+  while (nav.firstChild) nav.removeChild(nav.firstChild)
 
   var toc = document.createElement('ul')
   toc.className = 'toc'

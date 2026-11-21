@@ -137,8 +137,9 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 - 调用参数 `out` 可以指定另一个输出目录。
 - 页面内嵌四份文档；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，左侧是目录。
 - 页面不显示额外的状态或提示文案。
+- 页面在服务端预置四份文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
 - Markdown 由 marked 渲染，Mermaid 图由 mermaid 渲染，两者从 jsDelivr 加载。
-- 离线时页面回退为 Markdown 源码。
+- CDN 不可用时保留源码正文与图表源码。
 - 同样的文档得到同样的 HTML：不写时间戳，不读环境信息。
 
 ## lock
