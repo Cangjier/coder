@@ -1,0 +1,36 @@
+{
+  "name": "coder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Coder keeps a project's .coder/ design documents honest: list reports illegal, missing, and malformed documents and verifies the lock hash, lock/unlock manage the lock, update replaces design files through the review flow, and render turns them into a design.html page with Mermaid diagrams.",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "index.js",
+    "src",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "check": "node --check index.js && node --check src/docs.js && node --check src/glob.js && node --check src/git.js && node --check src/lock.js && node --check src/render.js && node --check src/tools/list.js && node --check src/tools/lock.js && node --check src/tools/render.js && node --check src/tools/root.js && node --check src/tools/update.js"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Coder",
+    "description": "Checks a project's .coder/ design documents: list reports missing, illegal, and malformed files and verifies the lock hash; lock/unlock manage the lock; update replaces files through the review flow; render turns the documents into a design.html page with Mermaid diagrams."
+  }
+}

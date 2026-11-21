@@ -1,0 +1,21 @@
+# coder bundle patch.
+#
+# 只贡献一行 Host 插件：coder。
+#
+#   coder  注册两个工具：
+#
+#     list    扫描项目根目录下的 `.coder/` 文档树：
+#             - 罗列所有文档；
+#             - 把不在预期集合里的文档标为非法文档；
+#             - 列出缺失的预期文档；
+#             - 按 docs/design.md 的格式约定诊断 file.md / architecture.md / flow.md。
+#
+#     render  把 `.coder/design/` 渲染成一个 `design.html`，默认写到
+#             `dist/.coder/design.html`。页面内嵌文档与诊断结果，Markdown 由
+#             marked 渲染，Mermaid 图由 mermaid 渲染。
+#
+# 文档目录、预期文档、输出文件和格式规则都是固化的：这个插件不接受配置。
+
+- insert:
+    - id: coder
+      name: 'coder'
