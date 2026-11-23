@@ -147,10 +147,8 @@ export function inspectDiagnosis(doc, text, severity, files) {
   const diagnostics = []
   const codes = []
 
-  if (text.trim() === '') {
-    diagnostics.push(diagnostic(doc, 1, 'doc.empty', '文档是空的。'))
-    return { diagnostics, codes }
-  }
+  // 诊断码描述的是源码里已经能识别的问题，源码还没写时留空是正常状态。
+  if (text.trim() === '') return { diagnostics, codes }
 
   const analysis = analyzeMarkdown(text)
   if (analysis.unclosed !== null) {
