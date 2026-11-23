@@ -1,5 +1,5 @@
 /**
- * `update` 工具：用 `tmp/` 下的源文件替换 `.coder/` 里的设计文档。
+ * `update` 工具：用 `tmp/` 下的源文件替换 `.coder/` 里的文档。
  *
  * 未上锁：直接替换，返回「未上锁、不推荐」提示，不提交。
  *
@@ -19,7 +19,7 @@ import { randomBytes } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
-import { CoderError, DOCS_DIR, EXPECTED_DOCS } from '../docs.js'
+import { CoderError, DOCS_DIR } from '../docs.js'
 import {
   assertRepoRoot,
   checkpointAll,
@@ -28,14 +28,33 @@ import {
   currentBranch,
   validateNewBranch,
 } from '../git.js'
-import { LOCK_PATH, hashCoder, readLock, rewriteLock, sha256Hex } from '../lock.js'
+import { LOCK_PATH, LOCK_RELATIVE, hashCoder, readLock, rewriteLock, sha256Hex } from '../lock.js'
 import { resolveRoot } from './root.js'
-
-/** update 允许替换的目标文件。 */
-const TARGETS = new Set(EXPECTED_DOCS.map((relative) => `${DOCS_DIR}/${relative}`))
 
 /** 源文件必须位于项目根目录的 tmp/ 下。 */
 const SOURCE_PREFIX = 'tmp/'
+
+/**
+ * 校验 update 的目标路径：`.coder/` 下的任意文件，但 `lock.md` 由工具维护。
+ *
+ * @param {string} target - 目标路径，使用 `/` 分隔。
+ * @returns {string|null} 问题；合法时为 null。
+ */
+function targetIssue(target) {
+  if (target.includes('\\')) return 'target 必须使用 / 分隔。'
+  if (path.posix.isAbsolute(target)) return `target 必须是相对于项目根目录的路径：${target}`
+  const segments = target.split('/')
+  if (segments.includes('') || segments.includes('.') || segments.includes('..')) {
+    return `target 不能包含空路径段、. 或 ..：${target}`
+  }
+  if (!target.startsWith(`${DOCS_DIR}/`)) {
+    return `target 必须位于 ${DOCS_DIR}/ 下；收到：${target}`
+  }
+  if (target === `${DOCS_DIR}/${LOCK_RELATIVE}`) {
+    return `${DOCS_DIR}/${LOCK_RELATIVE} 由 lock/unlock/update 自己维护，不能作为 target。`
+  }
+  return null
+}
 
 /** 等待第二次调用的 key。进程重启后失效。 */
 const pending = new Map()
@@ -84,9 +103,9 @@ async function normalizeUpdates(root, updates) {
     ) {
       throw new CoderError(`source 必须是 tmp/ 下的相对路径：${source}`)
     }
-    if (!TARGETS.has(target)) {
-      const allowed = [...TARGETS].join(', ')
-      throw new CoderError(`target 必须是以下文件之一：${allowed}；收到：${target}`)
+    const issue = targetIssue(target)
+    if (issue !== null) {
+      throw new CoderError(issue)
     }
     if (targets.has(target)) {
       throw new CoderError(`target 重复：${target}`)
@@ -104,8 +123,8 @@ async function normalizeUpdates(root, updates) {
     }
     const targetAbsolute = path.resolve(root, ...target.split('/'))
     const targetStat = await fs.lstat(targetAbsolute).catch(() => null)
-    if (targetStat === null || !targetStat.isFile()) {
-      throw new CoderError(`target 不存在或不是普通文件：${target}`)
+    if (targetStat !== null && !targetStat.isFile()) {
+      throw new CoderError(`target 已存在但不是普通文件：${target}`)
     }
     const content = await fs.readFile(sourceAbsolute)
     normalized.push({
@@ -184,6 +203,7 @@ function assertSameUpdates(current, previous) {
  */
 async function applyUpdates(updates) {
   for (const item of updates) {
+    await fs.mkdir(path.dirname(item.targetAbsolute), { recursive: true })
     await fs.writeFile(item.targetAbsolute, item.content)
   }
 }
@@ -198,8 +218,8 @@ export function createUpdateTool(logger) {
   return {
     name: 'update',
     description: [
-      'Replace .coder/ design or diagnosis documents with source files staged under tmp/.',
-      'updates is a non-empty array of { source, target }: source must be a file under the project tmp/ directory, and target must be one of the expected documents: .coder/design/file.md, architecture.md, flow.md, data_structure.md, .coder/diagnosis/error.md, .coder/diagnosis/warn.md.',
+      'Replace .coder/ documents with source files staged under tmp/.',
+      'updates is a non-empty array of { source, target }: source must be a file under the project tmp/ directory, and target is any file under .coder/ except .coder/lock.md. target may be an existing file or a new file; missing parent directories are created.',
       'Without a lock, update replaces the targets directly, returns a warning that the tree is unlocked and that update is intended for process changes, and makes no commit.',
       'While locked, update checks the lock hash on every call and refuses on a mismatch. The first call (no key) validates input, generates a random key, and returns a plan without modifying files: dsh must start a subagent to review the tmp sources and decide supplement or adjustment. The second call passes the same updates, the key, decision (supplement or adjustment), and review (the original user authorization text). It re-checks the lock hash and source hashes, replaces the files, updates the lock hash, and commits.',
       'supplement commits on the current branch. adjustment first commits the current working tree as a checkpoint, then creates the new branch named by the second call\'s branch argument, then replaces, hashes, and commits. The second adjustment call must pass branch; the second supplement call must omit it. No push and no complex rollback: git and the fs sandbox are the backstop.',
@@ -215,7 +235,7 @@ export function createUpdateTool(logger) {
         updates: {
           type: 'array',
           description:
-            'Files to replace. Each item maps a tmp/ source file to one expected .coder/ design or diagnosis target file.',
+            'Files to replace. Each item maps a tmp/ source file to one .coder/ target file; .coder/lock.md is not allowed.',
           items: {
             type: 'object',
             properties: {
@@ -226,7 +246,7 @@ export function createUpdateTool(logger) {
               target: {
                 type: 'string',
                 description:
-                  'Target document: .coder/design/file.md, architecture.md, flow.md, data_structure.md, .coder/diagnosis/error.md, or warn.md.',
+                  'Target path under .coder/, for example .coder/design/flow.md or .coder/plan/todo.md. .coder/lock.md is not allowed.',
               },
             },
             required: ['source', 'target'],
@@ -315,7 +335,7 @@ export function createUpdateTool(logger) {
             `目标文件：${updates.map((item) => item.target).join(', ')}`,
             '',
             '下一步：',
-            '1. 起子代理审查 tmp/ 中的源文件，判断是设计补充（supplement）还是设计调整（adjustment）。',
+            '1. 起子代理审查 tmp/ 中的源文件，判断是文档补充（supplement）还是文档调整（adjustment）。',
             '2. 带同样的 updates、key、decision、review（用户授权原文）再次调用 update；调整时还要带 branch（新建分支名）。',
             '补充：当前分支替换文件、更新 hash 并直接提交，不需要 branch。',
             '调整：先 commit 当前工作区作为 checkpoint，按传入的 branch 新建分支，再替换、更新 hash 并提交。',
@@ -363,7 +383,7 @@ export function createUpdateTool(logger) {
         const commit = await commitPaths(
           root,
           [...targetPaths, LOCK_PATH],
-          'coder: update design (supplement)',
+          'coder: update .coder (supplement)',
         )
         logger.info(`coder: update supplement applied ${updates.length} files; commit=${commit ?? 'none'}`)
         return {
@@ -374,7 +394,7 @@ export function createUpdateTool(logger) {
           hash,
           files: updates.map((item) => ({ source: item.source, target: item.target })),
           text: [
-            `已按设计补充替换 ${updates.length} 个文件。`,
+            `已按补充替换 ${updates.length} 个文件。`,
             `分支：${branchBefore}`,
             `commit：${commit ?? '无变化，未产生 commit'}`,
             `新 hash：sha256:${hash}`,
@@ -392,7 +412,7 @@ export function createUpdateTool(logger) {
       const commit = await commitPaths(
         root,
         [...targetPaths, LOCK_PATH],
-        'coder: update design (adjustment)',
+        'coder: update .coder (adjustment)',
       )
       logger.info(`coder: update adjustment applied ${updates.length} files on ${branch}; commit=${commit ?? 'none'}`)
       return {
@@ -404,7 +424,7 @@ export function createUpdateTool(logger) {
         hash,
         files: updates.map((item) => ({ source: item.source, target: item.target })),
         text: [
-          `已按设计调整新建分支并替换 ${updates.length} 个文件。`,
+          `已按调整新建分支并替换 ${updates.length} 个文件。`,
           `checkpoint：${checkpoint ?? '工作区干净，无需 checkpoint'}`,
           `分支：${branch}`,
           `commit：${commit ?? '无变化，未产生 commit'}`,

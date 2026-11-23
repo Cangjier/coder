@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Coder",
-    "description": "Checks a project's .coder/ design and diagnosis documents: list reports missing, illegal, and malformed files, validates diagnosis-code scopes, and verifies the lock hash; lock/unlock manage the lock; update replaces files through the review flow; render turns the documents into a design.html page with Mermaid diagrams."
+    "description": "Checks a project's .coder/ design, diagnosis, and plan documents: list reports missing, illegal, and malformed files, validates diagnosis-code scopes and plan codes, and verifies the lock hash; lock/unlock manage the lock; update replaces any .coder file through the review flow; render turns the documents into a design.html page with Mermaid diagrams."
   }
 }

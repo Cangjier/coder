@@ -13,6 +13,7 @@ import { after, before, describe, it } from 'node:test'
 
 import * as plugin from '../index.js'
 import { apply, name as pluginName } from '../index.js'
+import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# src
 源代码目录
@@ -125,6 +126,11 @@ function writeProject() {
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
+  mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
+  writeFileSync(join(root, '.coder', 'plan', 'todo.md'), PLAN_TODO)
+  writeFileSync(join(root, '.coder', 'plan', 'todo-archived.md'), PLAN_TODO_ARCHIVED)
+  writeFileSync(join(root, '.coder', 'plan', 'goal.md'), PLAN_GOAL)
+  writeFileSync(join(root, '.coder', 'plan', 'goal-archived.md'), PLAN_GOAL_ARCHIVED)
   return root
 }
 
@@ -183,7 +189,7 @@ describe('list tool', () => {
     assert.equal(report.ok, true)
     assert.equal(report.root, root)
     assert.equal(report.docsRoot, join(root, '.coder'))
-    assert.equal(report.summary.found, 6)
+    assert.equal(report.summary.found, 10)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 

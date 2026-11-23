@@ -37,6 +37,20 @@ flowchart TD
   J --> K
   K --> L[写入 diagnoses]
 ```
+## 检查计划文档
+在 list 时解析 todo / goal 与归档文档，校验编码、字段顺序、编号条目、完成预期、当前进度和关联 ToDo；同一个编码不能同时留在 active 与 archived。
+
+```mermaid
+flowchart TD
+  A[读取 plan 文档] --> B[按 # 分段解析编码]
+  B --> C[校验 T/G 前缀与 4 位数字]
+  C --> D[校验字段顺序与编号]
+  D --> E[校验完成预期、进度通配与关联 ToDo]
+  E --> F{active 与 archived 重复?}
+  F -- 是 --> G[报 plan.code.archived-duplicate]
+  F -- 否 --> H[写入 plans]
+```
+
 ## 加载插件
 ```mermaid
 flowchart TD
@@ -74,7 +88,7 @@ flowchart TD
   C --> D[返回 hashMatches]
 ```
 ## 更新文档
-update 从 tmp/ 读取源文件；上锁时先审查、再带 key 和 decision 执行。
+update 从 tmp/ 读取源文件，目标可以是 .coder/ 下的任意文件；上锁时先审查、再带 key 和 decision 执行。
 
 ```mermaid
 flowchart TD
@@ -88,11 +102,11 @@ flowchart TD
   G -- 调整 --> I[checkpoint + 按 branch 新建分支 + 提交]
 ```
 ## 渲染文档
-把六份预期文档渲染成一个 HTML 页面。
+把十份预期文档渲染成一个 HTML 页面。
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取 .coder/design 与 .coder/diagnosis]
+  A[render 调用] --> B[读取 .coder/design、diagnosis 与 plan]
   B --> C[汇总诊断]
   C --> D[生成 HTML]
   D --> E[写入 dist/.coder]

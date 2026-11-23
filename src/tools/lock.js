@@ -41,7 +41,7 @@ export function createLockTool(logger) {
     description: [
       'Lock the project .coder/ documentation tree.',
       'The authorization argument is the original user authorization text and is stored verbatim from line 3 of .coder/lock.md. Line 1 is a fixed declaration, line 2 is sha256 of every .coder file except lock.md (per-file content hashes concatenated, then hashed), and line 3 starts the authorization.',
-      'While locked, design changes must go through the update tool; direct edits are detected by list and update through the lock hash. The lock is a soft constraint and does not block file system or bash writes. Use unlock to remove it.',
+      'While locked, .coder changes must go through the update tool; direct edits are detected by list and update through the lock hash. The lock is a soft constraint and does not block file system or bash writes. Use unlock to remove it.',
     ].join(' '),
     parameters: {
       type: 'object',

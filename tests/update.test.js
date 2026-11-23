@@ -1,6 +1,6 @@
 /**
  * update 的行为测试：tmp 源文件、未上锁替换、上锁两步、key/review、
- * 设计补充提交和设计调整分支。
+ * 文档补充提交和文档调整分支。
  */
 
 import assert from 'node:assert/strict'
@@ -13,6 +13,7 @@ import { after, before, describe, it } from 'node:test'
 import { inspectDocs } from '../src/docs.js'
 import { createLockTool } from '../src/tools/lock.js'
 import { createUpdateTool } from '../src/tools/update.js'
+import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# .git/**
 git 目录
@@ -109,6 +110,11 @@ function writeProject(label = 'project') {
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
+  mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
+  writeFileSync(join(root, '.coder', 'plan', 'todo.md'), PLAN_TODO)
+  writeFileSync(join(root, '.coder', 'plan', 'todo-archived.md'), PLAN_TODO_ARCHIVED)
+  writeFileSync(join(root, '.coder', 'plan', 'goal.md'), PLAN_GOAL)
+  writeFileSync(join(root, '.coder', 'plan', 'goal-archived.md'), PLAN_GOAL_ARCHIVED)
   git(root, 'init', '-q')
   git(root, 'config', 'user.email', 'coder@example.test')
   git(root, 'config', 'user.name', 'coder test')
@@ -175,16 +181,57 @@ describe('update 未上锁', () => {
     assert.equal(report.diagnostics.length, 0)
   })
 
+  it('允许用 tmp 源文件替换计划文档', async () => {
+    const root = writeProject()
+    const next = PLAN_TODO.replace('解析与校验已实现', '解析与校验已更新')
+    writeFileSync(join(root, 'tmp', 'new-todo.md'), next)
+
+    const result = await createUpdateTool(logger).execute(
+      { root, updates: [{ source: 'tmp/new-todo.md', target: '.coder/plan/todo.md' }] },
+      { cwd: root },
+    )
+
+    assert.equal(result.locked, false)
+    assert.match(readFileSync(join(root, '.coder', 'plan', 'todo.md'), 'utf8'), /解析与校验已更新/)
+    const report = await inspectDocs({ root })
+    assert.equal(report.ok, true)
+  })
+
+  it('允许新建 .coder 下不存在的预期文档', async () => {
+    const root = writeProject()
+    rmSync(join(root, '.coder', 'plan', 'goal.md'))
+    writeFileSync(join(root, 'tmp', 'new-goal.md'), PLAN_GOAL)
+
+    const result = await createUpdateTool(logger).execute(
+      { root, updates: [{ source: 'tmp/new-goal.md', target: '.coder/plan/goal.md' }] },
+      { cwd: root },
+    )
+
+    assert.equal(result.locked, false)
+    assert.equal(readFileSync(join(root, '.coder', 'plan', 'goal.md'), 'utf8'), PLAN_GOAL)
+    const report = await inspectDocs({ root })
+    assert.equal(report.ok, true)
+  })
+
   it('拒绝 tmp 之外的源文件和非法目标', async () => {
     const root = writeProject()
+    writeFileSync(join(root, 'tmp', 'x.md'), 'x')
     const tool = createUpdateTool(logger)
     await assert.rejects(
       () => tool.execute({ root, updates: [{ source: 'other/x.md', target: '.coder/design/flow.md' }] }, { cwd: root }),
       /tmp\//,
     )
     await assert.rejects(
-      () => tool.execute({ root, updates: [{ source: 'tmp/x.md', target: '.coder/design/other.md' }] }, { cwd: root }),
-      /target/,
+      () => tool.execute({ root, updates: [{ source: 'tmp/x.md', target: 'docs/out.md' }] }, { cwd: root }),
+      /target 必须位于/,
+    )
+    await assert.rejects(
+      () => tool.execute({ root, updates: [{ source: 'tmp/x.md', target: '.coder/lock.md' }] }, { cwd: root }),
+      /lock\.md/,
+    )
+    await assert.rejects(
+      () => tool.execute({ root, updates: [{ source: 'tmp/x.md', target: '.coder/../outside.md' }] }, { cwd: root }),
+      /target 不能包含/,
     )
   })
 })
@@ -193,7 +240,7 @@ describe('update 已上锁', () => {
   it('第一次只返回 key 和计划，第二次补充后才替换并提交', async () => {
     const root = writeProject()
     await createLockTool(logger).execute({ root, authorization: '授权补充' }, { cwd: root })
-    writeFileSync(join(root, 'tmp', 'new-flow.md'), `${FLOW_OK}\n设计补充\n`)
+    writeFileSync(join(root, 'tmp', 'new-flow.md'), `${FLOW_OK}\n文档补充\n`)
     const before = commitCount(root)
     const branchBefore = git(root, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
     const tool = createUpdateTool(logger)
@@ -223,7 +270,7 @@ describe('update 已上锁', () => {
     assert.equal(second.decision, 'supplement')
     assert.equal(second.branch, branchBefore)
     assert.match(second.commit, /^[0-9a-f]{40}$/)
-    assert.match(flowOf(root), /设计补充/)
+    assert.match(flowOf(root), /文档补充/)
     assert.equal(commitCount(root), String(Number(before) + 1))
     assert.match(git(root, 'log', '-1', '--format=%s'), /supplement/)
 
@@ -266,10 +313,10 @@ describe('update 已上锁', () => {
     assert.match(flowOf(root), /直接改/)
   })
 
-  it('设计调整先 checkpoint 再新建分支', async () => {
+  it('文档调整先 checkpoint 再新建分支', async () => {
     const root = writeProject()
     await createLockTool(logger).execute({ root, authorization: '授权调整' }, { cwd: root })
-    writeFileSync(join(root, 'tmp', 'new-flow.md'), `${FLOW_OK}\n设计调整\n`)
+    writeFileSync(join(root, 'tmp', 'new-flow.md'), `${FLOW_OK}\n文档调整\n`)
     const tool = createUpdateTool(logger)
 
     const first = await tool.execute({ root, updates: UPDATES }, { cwd: root })
@@ -304,7 +351,7 @@ describe('update 已上锁', () => {
     assert.match(second.checkpoint, /^[0-9a-f]{40}$/)
     assert.match(second.commit, /^[0-9a-f]{40}$/)
     assert.equal(git(root, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), second.branch)
-    assert.match(flowOf(root), /设计调整/)
+    assert.match(flowOf(root), /文档调整/)
     assert.match(git(root, 'log', '--all', '--format=%s'), /checkpoint before design adjustment/)
     assert.match(git(root, 'log', '--all', '--format=%s'), /adjustment/)
 

@@ -11,6 +11,7 @@ import { after, before, describe, it } from 'node:test'
 import { inspectDocs } from '../src/docs.js'
 import { LOCK_DECLARATION, LOCK_HASH_PREFIX } from '../src/lock.js'
 import { createLockTool, createUnlockTool } from '../src/tools/lock.js'
+import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# src
 源码目录
@@ -97,6 +98,11 @@ function writeProject(label = 'project') {
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
+  mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
+  writeFileSync(join(root, '.coder', 'plan', 'todo.md'), PLAN_TODO)
+  writeFileSync(join(root, '.coder', 'plan', 'todo-archived.md'), PLAN_TODO_ARCHIVED)
+  writeFileSync(join(root, '.coder', 'plan', 'goal.md'), PLAN_GOAL)
+  writeFileSync(join(root, '.coder', 'plan', 'goal-archived.md'), PLAN_GOAL_ARCHIVED)
   return root
 }
 
@@ -116,7 +122,7 @@ describe('lock / unlock', () => {
     const result = await tool.execute({ root, authorization }, { cwd: root })
 
     assert.equal(result.locked, true)
-    assert.equal(result.files.length, 6)
+    assert.equal(result.files.length, 10)
     const lockText = readFileSync(join(root, '.coder', 'lock.md'), 'utf8')
     const lines = lockText.split('\n')
     assert.equal(lines[0], LOCK_DECLARATION)

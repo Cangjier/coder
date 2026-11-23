@@ -8,6 +8,7 @@
  * - architecture.md / flow.md 渲染成 Markdown，Mermaid 图由浏览器绘制；
  * - data_structure.md 渲染成 Markdown，TypeScript 代码块按原文展示；
  * - diagnosis/error.md 与 warn.md 渲染成 Markdown 诊断码目录；
+ * - plan/todo.md、todo-archived.md、goal.md 与 goal-archived.md 渲染成 Markdown 计划条目；
  * - 不显示状态卡、页脚、说明文案或回退提示。
  *
  * Markdown 由 `marked` 渲染，Mermaid 由 `mermaid` 渲染，两者从 jsDelivr
@@ -558,7 +559,8 @@ ${renderFallbackSections(docs)}
     body.className = 'markdown'
     try {
       var diagnosis = doc.kind === 'diagnosis-error' || doc.kind === 'diagnosis-warn'
-      body.innerHTML = window.marked.parse(doc.content, { gfm: true, breaks: diagnosis })
+      var plan = doc.kind.indexOf('plan-') === 0
+      body.innerHTML = window.marked.parse(doc.content, { gfm: true, breaks: diagnosis || plan })
     } catch (error) {
       return
     }
@@ -650,7 +652,7 @@ ${renderFallbackSections(docs)}
 }
 
 /**
- * 渲染 `.coder/design/` 到 `design.html`。
+ * 渲染 `.coder/` 的预期文档到 `design.html`。
  *
  * @param {object} options - 选项。
  * @param {string} options.root - 项目根目录。
@@ -712,7 +714,7 @@ export async function renderDesign({ root, outDir }) {
       `已生成 ${OUTPUT_FILE}`,
       `输出：${output}`,
       `大小：${bytes} 字节`,
-      `文档：${report.summary.found}/${report.summary.expected}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}`,
+      `文档：${report.summary.found}/${report.summary.expected}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}`,
       '在浏览器中打开即可查看；Markdown 与 Mermaid 由 jsDelivr 上的 marked/mermaid 渲染，离线时回退为源码。',
     ].join('\n'),
   }

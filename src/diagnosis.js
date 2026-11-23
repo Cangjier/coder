@@ -28,8 +28,10 @@
  * @module coder/diagnosis
  */
 
-import { matchGlob } from './glob.js'
 import { analyzeMarkdown } from './markdown.js'
+import { scopeIssue, scopeMatches, stepScopeIssue } from './scope.js'
+
+export { scopeMatches }
 
 /** 两份诊断文档，相对于 `.coder/`。 */
 export const DIAGNOSIS_DOCS = Object.freeze(['diagnosis/error.md', 'diagnosis/warn.md'])
@@ -70,9 +72,6 @@ const VIEW_STEP_PATTERN =
 /** 插入日志只接受 ts/typescript 围栏。 */
 const LOG_LANGS = new Set(['ts', 'typescript'])
 
-/** 文件路径通配里不允许出现的路径写法。 */
-const ABSOLUTE_PATH = /^[\\/]|^[A-Za-z]:[\\/]/
-
 /**
  * 把文档类型换算成诊断级别。
  *
@@ -106,48 +105,6 @@ function stripInlineCode(text) {
   const trimmed = text.trim()
   const match = /^`([^`]+)`$/.exec(trimmed)
   return match ? match[1].trim() : trimmed
-}
-
-/**
- * 校验一个文件路径/通配值。
- *
- * @param {string} value - 作用范围或步骤里的文件通配。
- * @returns {string|null} 问题；合法时为 null。
- */
-function scopeIssue(value) {
-  if (value === '全局') return null
-  if (value === '') return '文件通配不能为空。'
-  if (ABSOLUTE_PATH.test(value)) return `文件通配必须相对于项目根目录：${value}`
-  if (value.includes('\\')) return `文件通配必须使用 / 分隔：${value}`
-  if (value.includes('[') || value.includes(']')) return `文件通配不能包含方括号：${value}`
-  const segments = value.split('/')
-  if (segments.includes('..')) return `文件通配不能包含 ..：${value}`
-  if (segments.includes('.')) return `文件通配不能包含 . 路径段：${value}`
-  if (segments.includes('')) return `文件通配不能以 / 结尾或包含空路径段：${value}`
-  return null
-}
-
-/**
- * 校验步骤里的文件通配。步骤必须指向具体文件，不能写全局。
- *
- * @param {string} value - 步骤里的文件通配。
- * @returns {string|null} 问题；合法时为 null。
- */
-function stepGlobIssue(value) {
-  if (value === '全局') return '步骤必须指定文件路径通配，不能写全局。'
-  return scopeIssue(value)
-}
-
-/**
- * 判断某个文件是否落在作用范围内。
- *
- * @param {string} scope - 作用范围。
- * @param {string} file - 项目文件，相对路径。
- * @returns {boolean} 是否匹配。
- */
-export function scopeMatches(scope, file) {
-  if (scope === '全局') return true
-  return matchGlob(scope, file)
 }
 
 /**
@@ -407,11 +364,11 @@ export function inspectDiagnosis(doc, text, severity, files) {
 
         let matches = null
         if (step.glob !== null) {
-          const issue = stepGlobIssue(step.glob)
+          const issue = stepScopeIssue(step.glob)
           if (issue !== null) {
             diagnostics.push(diagnostic(doc, line, 'diagnosis.step.glob', issue))
           } else if (files !== undefined) {
-            matches = files.filter((file) => matchGlob(step.glob, file)).length
+            matches = files.filter((file) => scopeMatches(step.glob, file)).length
             if (matches === 0) {
               diagnostics.push(
                 diagnostic(

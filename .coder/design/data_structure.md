@@ -1,6 +1,6 @@
 # 数据结构
 
-只记录跨模块传递的关键结构：诊断、诊断码、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
+只记录跨模块传递的关键结构：诊断、诊断码、计划条目、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
 
 ## 诊断
 
@@ -66,6 +66,38 @@ export interface DiagnosisCode {
 }
 ```
 
+## 计划条目
+
+计划文档解析出的 todo / goal 条目；`list` 用它展示编码、归档状态、范围、优先级和条目数。
+
+```ts
+export type PlanKind = 'todo' | 'goal'
+
+export type PlanPriority = 'P1' | 'P2' | 'P3'
+
+export interface PlanEntry {
+  /** 展示用文档路径，例如 .coder/plan/todo.md */
+  doc: string
+  /** 编码标题所在行 */
+  line: number
+  /** T0001 或 G0001 */
+  code: string
+  kind: PlanKind
+  /** 是否位于 archived 文档 */
+  archived: boolean
+  /** 全局或文件路径通配；任务范围无效时为 null */
+  scope: string | null
+  /** todo 的优先级；goal 为 null */
+  priority: PlanPriority | null
+  /** 完成预期条目数 */
+  expected: number
+  /** 当前进度条目数；goal 为 0 */
+  progress: number
+  /** 关联 ToDo 条目数；todo 为 0 */
+  todos: number
+}
+```
+
 ## 文档条目
 
 `.coder/` 下扫描到的每个文件都变成一条文档条目，预期、非法和缺失共用同一种形状。
@@ -78,6 +110,10 @@ export type DocumentKind =
   | 'data'
   | 'diagnosis-error'
   | 'diagnosis-warn'
+  | 'plan-todo'
+  | 'plan-todo-archived'
+  | 'plan-goal'
+  | 'plan-goal-archived'
   | 'lock'
   | 'generic'
 
@@ -115,6 +151,8 @@ export interface Summary {
   diagnostics: number
   /** 解析出的诊断码数量 */
   codes: number
+  /** 解析出的计划条目数量 */
+  plans: number
   /** .coder/lock.md 是否存在 */
   locked: boolean
 }
@@ -135,6 +173,8 @@ export interface Report {
   diagnostics: Diagnostic[]
   /** 两份诊断文档解析出的诊断码 */
   diagnoses: DiagnosisCode[]
+  /** 四份计划文档解析出的计划条目 */
+  plans: PlanEntry[]
   summary: Summary
   /** 锁的状态；未上锁时为 null */
   lock: LockReport | null
@@ -145,7 +185,7 @@ export interface Report {
 
 ## 渲染
 
-渲染接收六份预期文档的正文，输出页面路径、字节数和当前的检查状态。
+渲染接收十份预期文档的正文，输出页面路径、字节数和当前的检查状态。
 
 ```ts
 export interface RenderDocument {
@@ -214,7 +254,7 @@ export interface LockReport {
 export interface UpdateItem {
   /** tmp/ 下的源文件，相对项目根目录 */
   source: string
-  /** .coder 下的目标文件 */
+  /** .coder 下的目标文件，不能是 .coder/lock.md */
   target: string
 }
 

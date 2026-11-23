@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到五个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到五个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目由 list 校验字段与归档状态，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -26,6 +26,7 @@ flowchart TB
     flow["flow.md 校验"]
     data["data_structure.md 校验"]
     diag["诊断码校验"]
+    plan["计划文档校验"]
     scope["作用范围命中"]
     lockHash["lock.md hash 校验"]
     report["报告汇总"]
@@ -84,6 +85,20 @@ flowchart LR
   G --> H
 ```
 
+## 局部视角：计划文档
+只回答「todo / goal 如何被校验和归档」：编码、字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及 active 与 archived 是否重复。
+
+```mermaid
+flowchart LR
+  A[读取 todo / goal 与归档文档] --> B[解析 # T0001 / # G0001]
+  B --> C[校验前缀与 4 位数字]
+  C --> D[校验字段顺序与编号条目]
+  D --> E[校验完成预期、进度通配与关联 ToDo]
+  E --> F{同一编码在 active 与 archived?}
+  F -- 是 --> G[报 plan.code.archived-duplicate]
+  F -- 否 --> H[写入 plans]
+```
+
 ## 局部视角：数据结构
 只回答「data_structure.md 如何被校验」：按 `##` 分段，每段读取 ts 围栏，提取 interface 名称并查重。
 
@@ -117,7 +132,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取六份预期文档]
+  A[render 调用] --> B[读取十份预期文档]
   B --> C[汇总诊断]
   C --> D[生成 HTML]
   D --> E[写入 dist/.coder/design.html]

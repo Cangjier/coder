@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 
 import { DOCS_DIR, EXPECTED_DOCS, fileCoverage, inspectDocs, validateDocument } from '../src/docs.js'
+import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# src
 源代码目录
@@ -121,6 +122,10 @@ function writeValidTree() {
     '.coder/design/data_structure.md': DATA_OK,
     '.coder/diagnosis/error.md': ERROR_OK,
     '.coder/diagnosis/warn.md': WARN_OK,
+    '.coder/plan/todo.md': PLAN_TODO,
+    '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
+    '.coder/plan/goal.md': PLAN_GOAL,
+    '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
   })
 }
 
@@ -146,8 +151,8 @@ describe('inspectDocs', () => {
     assert.deepEqual(report.illegal, [])
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.diagnostics, [])
-    assert.equal(report.summary.expected, 6)
-    assert.equal(report.summary.found, 6)
+    assert.equal(report.summary.expected, 10)
+    assert.equal(report.summary.found, 10)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 
@@ -160,6 +165,10 @@ describe('inspectDocs', () => {
         '.coder/design/data_structure.md': DATA_OK,
         '.coder/diagnosis/error.md': ERROR_OK,
         '.coder/diagnosis/warn.md': WARN_OK,
+        '.coder/plan/todo.md': PLAN_TODO,
+        '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
+        '.coder/plan/goal.md': PLAN_GOAL,
+        '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
         '.coder/design/extra.md': '# extra\n多余文档\n',
         '.coder/design/notes.txt': 'not markdown',
       }),
@@ -179,6 +188,10 @@ describe('inspectDocs', () => {
       '.coder/design/data_structure.md': DATA_OK,
       '.coder/diagnosis/error.md': ERROR_OK,
       '.coder/diagnosis/warn.md': WARN_OK,
+      '.coder/plan/todo.md': PLAN_TODO,
+      '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
+      '.coder/plan/goal.md': PLAN_GOAL,
+      '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
     })
     const report = await inspect(root)
     assert.equal(report.ok, false)
@@ -191,7 +204,7 @@ describe('inspectDocs', () => {
     const root = mkdtempSync(join(tempRoot, 'empty-'))
     const report = await inspect(root)
     assert.equal(report.docsRootExists, false)
-    assert.equal(report.missing.length, 6)
+    assert.equal(report.missing.length, 10)
     assert.equal(report.ok, false)
     assert.match(report.text, /不存在/)
   })
@@ -211,6 +224,10 @@ describe('inspectDocs', () => {
       '.coder/design/data_structure.md': DATA_OK,
       '.coder/diagnosis/error.md': ERROR_OK,
       '.coder/diagnosis/warn.md': WARN_OK,
+      '.coder/plan/todo.md': PLAN_TODO,
+      '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
+      '.coder/plan/goal.md': PLAN_GOAL,
+      '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
       'README.md': '# hello\n',
       'extra.txt': 'x',
     })
@@ -592,6 +609,10 @@ describe('fixed document set', () => {
     'design/data_structure.md',
     'diagnosis/error.md',
     'diagnosis/warn.md',
+    'plan/todo.md',
+    'plan/todo-archived.md',
+    'plan/goal.md',
+    'plan/goal-archived.md',
   ])
   })
 })

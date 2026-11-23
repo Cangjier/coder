@@ -3,10 +3,10 @@
 Coder 是一个 DSH Host 插件，提供五个确定性工具：
 
 - `list`：检查项目的 `.coder/` 文档树和锁 hash。
-- `render`：把 `.coder/` 的设计文档与诊断文档渲染成一个 `design.html`。
+- `render`：把 `.coder/` 的设计、诊断与计划文档渲染成一个 `design.html`。
 - `lock`：写入 `.coder/lock.md`，记录当前 hash 和授权原文。
 - `unlock`：删除 `.coder/lock.md`。
-- `update`：用 `tmp/` 下的源文件替换 `.coder` 设计或诊断文档；上锁时分两步执行。
+- `update`：用 `tmp/` 下的源文件替换 `.coder` 下的文档；上锁时分两步执行。
 
 它不生成设计内容，也不调用模型：`list` 只读文档并报告状态，`render` 只把已有文档写成 HTML，`update` 只做确定性的校验、替换和 git 提交。
 
@@ -14,7 +14,7 @@ Coder 是一个 DSH Host 插件，提供五个确定性工具：
 
 ## .coder 文档树
 
-项目根目录下的 `.coder/` 按约定维护四份设计文档和两份诊断文档：
+项目根目录下的 `.coder/` 按约定维护四份设计文档、两份诊断文档和四份计划文档：
 
 | 文档 | 作用 |
 | --- | --- |
@@ -24,26 +24,33 @@ Coder 是一个 DSH Host 插件，提供五个确定性工具：
 | `.coder/design/data_structure.md` | 关键数据结构（TypeScript interface） |
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
+| `.coder/plan/todo.md` | T 开头的进行中待办 |
+| `.coder/plan/todo-archived.md` | T 开头的已归档待办 |
+| `.coder/plan/goal.md` | G 开头的进行中目标 |
+| `.coder/plan/goal-archived.md` | G 开头的已归档目标 |
+
+计划文档用编码组织：todo 只放 `T` 加 4 位数字（如 `T0001`），goal 只放 `G` 加 4 位数字（如 `G0001`）。todo 写 `任务范围`、`优先级`（P1/P2/P3）、`完成预期` 和 `当前进度`；goal 写 `任务范围`、`完成预期` 和 `关联ToDo`。完成预期条目写成 `如果 ... 则 ...，否则 ...`，当前进度条目写成 `[文件通配] 说明`。任务完成后从 active 文档移到 archived 文档；同一个编码不能同时留在两边。空计划文档表示当前没有待办或归档记录。归档时用 `update` 替换 active 与 archived 文档，把完成条目从 active 移入 archived。字段之间空一行，Markdown 才会逐行显示。
 
 `architecture.md` 用 Mermaid `flowchart` + `subgraph` 画多张图：第一个 `## 全局视角`，后面是若干 `## 局部视角：<名称>`。每个视角一段说明 + 一张图。`data_structure.md` 只记录跨模块的关键结构，按 `##` 分段，用 `ts` 围栏和 TypeScript `interface` 表达。
 
 诊断文档用诊断码组织：`error.md` 只放 `E` 加 4 位数字（如 `E0001`），`warn.md` 只放 `W` 加 4 位数字（如 `W0001`）。每个诊断码写 `作用范围`、`诊断方式：静态代码审查` 或 `诊断方式：运行时日志审查`，再用 `步骤N：` 写具体步骤。静态步骤写成 `步骤N：查看 [文件通配] 代码位置描述，如果 ...，则 ...，否则 ...`；运行时步骤用 `步骤N：在 [文件通配] 代码位置描述，插入日志：` 后接 `ts` 伪代码，再用 `步骤N：查看日志，如果 ...，则 ...，否则 ...` 判断。作用范围、诊断方式和每个步骤之间空一行，Markdown 才会逐行显示。
 
-`.coder/lock.md` 是锁状态文件，不属于六份预期文档；`list` 会把它标为 `lock`，`render` 不渲染它。
+`.coder/lock.md` 是锁状态文件，不属于十份预期文档；`list` 会把它标为 `lock`，`render` 不渲染它。
 
 `file.md` 的路径支持通配：`*` 匹配一个路径段内的任意字符，`**` 匹配零层或多层目录。`tmp/**` 同时表达目录 `tmp` 和它下面的文件，不需要再写 `tmp`。项目里的每个文件（`.coder` 自身除外）都必须被至少一个路径/通配覆盖。`.coder` 自身或它下面的路径不能出现在 `file.md` 中，出现会报 `file.entry.coder`。
 
 ## list
 
-`list` 每次调用做七件事：
+`list` 每次调用做八件事：
 
 1. 罗列 `.coder/` 下的所有文档，`lock.md` 标为 `lock`。
 2. 不在预期集合、也不是 `lock.md` 的文档标记为**非法文档**。
 3. 列出所有**缺失**的预期文档。
 4. 按 [`docs/design.md`](docs/design.md) 的格式约定诊断每个文档，返回带行号的诊断记录。
 5. 解析两份诊断文档：校验编码前缀与 4 位数字、作用范围、诊断方式、步骤格式、步骤编号、文件通配命中和日志围栏。
-6. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`file.md` 中出现 `.coder` 会报错。
-7. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+6. 解析四份计划文档：校验编码、字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及 active 与 archived 是否重复。
+7. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`file.md` 中出现 `.coder` 会报错。
+8. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
 诊断码的作用范围是文件通配时，以及步骤里的文件通配，都要求至少命中一个项目文件；步骤内容是自然语言，`list` 只检查格式，不执行它们。
 
@@ -61,7 +68,7 @@ Coder 是一个 DSH Host 插件，提供五个确定性工具：
 
 默认写入 `dist/.coder/design.html`。`out` 可以指定另一个输出目录，文件名固定为 `design.html`。
 
-页面内嵌六份预期文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，`error.md` / `warn.md` 显示为 Markdown 诊断码目录，左侧是目录。页面不显示额外的状态或提示文案。服务端先写入六份文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
+页面内嵌十份预期文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，`error.md` / `warn.md` 显示为 Markdown 诊断码目录，`plan/` 下的四份文档显示为 Markdown 计划条目，左侧是目录。页面不显示额外的状态或提示文案。服务端先写入十份文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
 
 ## lock / unlock
 
@@ -86,13 +93,13 @@ Coder 是一个 DSH Host 插件，提供五个确定性工具：
 }
 ```
 
-`source` 必须位于项目根目录的 `tmp/` 下，`target` 必须是六份预期文档之一且已经存在。使用 git 的项目请在 file.md 里用 `# .git/**` 覆盖 git 目录，并用 `# tmp/**` 覆盖暂存目录，否则 `list` 会按未覆盖文件报告。
+`source` 必须位于项目根目录的 `tmp/` 下，`target` 是 `.coder/` 下的任意文件（`.coder/lock.md` 除外），可以已经存在，也可以缺失。缺失时会创建目标文件和必要的父目录。使用 git 的项目请在 file.md 里用 `# .git/**` 覆盖 git 目录，并用 `# tmp/**` 覆盖暂存目录，否则 `list` 会按未覆盖文件报告。
 
 未上锁时直接替换，返回「未上锁、update 用于流程变更、不推荐」的提示，不提交。
 
 已上锁时分两步：
 
-1. 第一次调用返回随机 `key` 和流程计划，不修改文件；dsh 起子代理审查 tmp 源文件，判断是设计补充还是设计调整。
+1. 第一次调用返回随机 `key` 和流程计划，不修改文件；dsh 起子代理审查 tmp 源文件，判断是文档补充还是文档调整。
 2. 第二次调用带相同的 `updates`、`key`、`decision`（`supplement` / `adjustment`）、`review`（本次更新的用户授权原文）；选择 `adjustment` 时还必须带 `branch`（新建分支名）。`update` 重新检查 lock hash 和源文件 hash，替换文件、更新 lock.md 的 hash，并按 decision 提交。
 
 `supplement` 在当前分支提交，不需要 `branch`。`adjustment` 先把当前工作区提交为 checkpoint，按传入的 `branch` 新建分支，再替换、更新 hash 并提交。不 push；复杂失败场景交给 git 和 dsh 的 fs 沙盒。
@@ -104,9 +111,10 @@ Coder 是一个 DSH Host 插件，提供五个确定性工具：
 | 内容 | 值 |
 | --- | --- |
 | 文档树目录 | `.coder` |
-| 预期文档 | `design/file.md`、`design/architecture.md`、`design/flow.md`、`design/data_structure.md`、`diagnosis/error.md`、`diagnosis/warn.md` |
+| 预期文档 | `design/file.md`、`design/architecture.md`、`design/flow.md`、`design/data_structure.md`、`diagnosis/error.md`、`diagnosis/warn.md`、`plan/todo.md`、`plan/todo-archived.md`、`plan/goal.md`、`plan/goal-archived.md` |
 | 覆盖范围 | 项目所有文件，`.coder` 自身及其内容除外 |
 | 诊断码 | `error.md` 只允许 `E\d{4}`，`warn.md` 只允许 `W\d{4}` |
+| 计划编码 | todo 文档只允许 `T\d{4}`，goal 文档只允许 `G\d{4}` |
 | 非预期白名单 | `.coder/lock.md` |
 | 锁 hash | 所有 `.coder` 文件（除 lock.md）内容 sha256 拼接后再 sha256 |
 | 默认渲染输出 | `dist/.coder/design.html` |
@@ -120,4 +128,4 @@ npm test
 npm run check
 ```
 
-插件是纯 ESM、零运行时依赖，只使用 Node 内置模块。`list` 的扫描与校验逻辑在 `src/docs.js`，诊断文档解析在 `src/diagnosis.js`，Markdown 结构扫描在 `src/markdown.js`，锁格式与 hash 在 `src/lock.js`，HTML 生成在 `src/render.js`，git 操作在 `src/git.js`，工具定义在 `src/tools/`。
+插件是纯 ESM、零运行时依赖，只使用 Node 内置模块。`list` 的扫描与校验逻辑在 `src/docs.js`，诊断文档解析在 `src/diagnosis.js`，计划文档解析在 `src/plan.js`，作用范围校验在 `src/scope.js`，Markdown 结构扫描在 `src/markdown.js`，锁格式与 hash 在 `src/lock.js`，HTML 生成在 `src/render.js`，git 操作在 `src/git.js`，工具定义在 `src/tools/`。

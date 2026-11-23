@@ -11,19 +11,23 @@ bundle 补丁：插入 id 为 coder 的 Host 插件行。
 # src
 源码目录。
 ## src/docs.js
-文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份设计文档和两份诊断文档的确定性检查，并汇总诊断码作用范围。
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份设计文档、两份诊断文档和四份计划文档的确定性检查，并汇总诊断码作用范围与计划条目。
 ## src/glob.js
 通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
 ## src/markdown.js
 Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/diagnosis.js
 诊断文档：解析 error.md / warn.md，校验诊断码、作用范围、诊断方式、步骤格式与编号，并检查文件通配命中。
+## src/scope.js
+作用范围：全局与文件路径通配的合法性校验，以及通配命中。
+## src/plan.js
+计划文档：解析 todo / goal 及归档文档，校验编码、字段顺序、编号、完成预期、当前进度与关联 ToDo。
 ## src/lock.js
 锁文件：lock.md 的格式解析、.coder hash 计算与读写。
 ## src/git.js
 update 的 git 操作：提交指定文件、checkpoint 与新建分支。
 ## src/render.js
-HTML 渲染：把六份预期文档写成单页 design.html。
+HTML 渲染：把十份预期文档写成单页 design.html。
 # src/tools
 工具定义目录。
 ## src/tools/list.js
@@ -35,13 +39,17 @@ HTML 渲染：把六份预期文档写成单页 design.html。
 ## src/tools/root.js
 所有工具共用的项目根目录解析。
 ## src/tools/update.js
-`update` 工具：校验 tmp 源、上锁时分两步、替换并更新 hash，按 decision 提交。
+`update` 工具：校验 tmp 源与 .coder 目标、上锁时分两步、替换并更新 hash，按 decision 提交。
 # tests
 测试目录。
 ## tests/docs.test.js
-覆盖扫描、缺失、非法、文件覆盖与六份文档的格式诊断。
+覆盖扫描、缺失、非法、文件覆盖与十份文档的格式诊断。
 ## tests/diagnosis.test.js
 覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。
+## tests/plan.test.js
+覆盖计划编码、字段、编号、完成预期、当前进度、关联 ToDo 与归档一致性。
+## tests/fixtures.js
+多份测试共用的计划文档合法样本。
 ## tests/glob.test.js
 覆盖 *、**、? 与 tmp/** 的匹配行为。
 ## tests/plugin.test.js

@@ -5,11 +5,12 @@
  * `<root>/.coder/` 下的文件全部列出来，与预期集合比对，再按
  * `docs/design.md` 的格式约定逐份诊断。
  *
- * 四份设计文档和两份诊断文档的规则都以「确定性」为前提，所以只做能够
- * 机械判定的检查：标题路径是否合法、同一路径是否重复、说明是否为空、
- * 是否有反向表述、视角是否有图、场景是否有 mermaid 图、数据结构是否用
- * ts interface 表达、诊断码与作用范围是否合法、步骤格式与编号、文件通配范围是否命中。
- * 判不了的（例如图是否真的描述了代码）不猜，也不报。
+ * 四份设计文档、两份诊断文档和四份计划文档的规则都以「确定性」为前提，
+ * 所以只做能够机械判定的检查：标题路径是否合法、同一路径是否重复、说明是否
+ * 为空、是否有反向表述、视角是否有图、场景是否有 mermaid 图、数据结构是否用
+ * ts interface 表达、诊断码与作用范围是否合法、步骤格式与编号、文件通配范围
+ * 是否命中、计划编码与字段顺序、编号条目和关联 ToDo 是否合法。
+ * 判不了的（例如图是否真的描述了代码、任务是否真的完成）不猜，也不报。
  *
  * 文档目录、预期文档和格式规则都是固化的，不接受配置。
  *
@@ -23,6 +24,7 @@ import { DIAGNOSIS_DOCS, diagnosisSeverity, inspectDiagnosis } from './diagnosis
 import { matchGlob } from './glob.js'
 import { LOCK_DECLARATION, LOCK_RELATIVE, hashCoder, readLock } from './lock.js'
 import { analyzeMarkdown } from './markdown.js'
+import { PLAN_DOCS, inspectPlan, planKindOf } from './plan.js'
 
 export { analyzeMarkdown }
 
@@ -36,6 +38,7 @@ export const EXPECTED_DOCS = Object.freeze([
   'design/flow.md',
   'design/data_structure.md',
   ...DIAGNOSIS_DOCS,
+  ...PLAN_DOCS,
 ])
 
 /** 会被当作 Markdown 诊断的扩展名。 */
@@ -61,15 +64,17 @@ export class CoderError extends Error {
 /**
  * 根据文档路径推断它属于哪一类格式。
  *
- * 设计文档用 basename 判断；诊断文档按完整相对路径判断，避免其他目录里
- * 同名的 error.md / warn.md 被误认。
+ * 设计文档用 basename 判断；诊断文档和计划文档按完整相对路径判断，避免其他
+ * 目录里同名的 error.md / warn.md / todo.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
- * @returns {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'lock'|'generic'} 文档类型。
+ * @returns {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'lock'|'generic'} 文档类型。
  */
 export function kindOf(relative) {
   if (relative === 'diagnosis/error.md') return 'diagnosis-error'
   if (relative === 'diagnosis/warn.md') return 'diagnosis-warn'
+  const planKind = planKindOf(relative)
+  if (planKind !== null) return planKind
   const base = path.posix.basename(relative).toLowerCase()
   if (base === 'file.md') return 'file'
   if (base === 'architecture.md') return 'architecture'
@@ -594,13 +599,16 @@ function validateFlow(doc, analysis) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文档正文。
- * @param {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'lock'|'generic'} kind - 文档类型。
+ * @param {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'lock'|'generic'} kind - 文档类型。
  * @param {string[]} [files] - 项目文件；诊断文档用它检查文件通配范围。
  * @returns {object[]} 诊断。
  */
 export function validateDocument(doc, text, kind, files) {
   if (kind === 'diagnosis-error' || kind === 'diagnosis-warn') {
     return inspectDiagnosis(doc, text, diagnosisSeverity(kind), files).diagnostics
+  }
+  if (kind.startsWith('plan-')) {
+    return inspectPlan(doc, text, kind).diagnostics
   }
 
   const diagnostics = []
@@ -696,7 +704,7 @@ function formatReport(report) {
   const lines = [`Coder 文档检查：${report.docsRoot}`]
   if (!report.docsRootExists) lines.push(`（${DOCS_DIR}/ 不存在。）`)
   lines.push(
-    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}${report.summary.locked ? '｜已上锁' : ''}`,
+    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}${report.summary.locked ? '｜已上锁' : ''}`,
   )
   lines.push('')
   lines.push('文档：')
@@ -723,6 +731,18 @@ function formatReport(report) {
             : '作用范围无效'
       const method = item.method ?? '诊断方式无效'
       lines.push(`  ${item.code} [${item.severity}] ${scope}｜诊断方式 ${method}｜步骤 ${item.steps.length}`)
+    }
+  }
+  if (report.plans.length > 0) {
+    lines.push('')
+    lines.push('计划：')
+    for (const item of report.plans) {
+      const scope = item.scope ?? '任务范围无效'
+      const priority = item.priority === null ? '' : `｜${item.priority}`
+      const todos = item.kind === 'goal' ? `｜关联 ToDo ${item.todos}` : `｜进度 ${item.progress}`
+      lines.push(
+        `  ${item.code} [${item.archived ? '归档' : '进行中'}] ${item.kind}${priority}｜${scope}｜完成预期 ${item.expected}${todos}`,
+      )
     }
   }
   if (report.diagnostics.length > 0) {
@@ -757,6 +777,7 @@ export async function inspectDocs({ root }) {
   const docsRoot = path.resolve(absoluteRoot, DOCS_DIR)
   const diagnostics = []
   const diagnoses = []
+  const plans = []
   let docsRootExists = false
   let discovered = []
   let projectFiles = null
@@ -854,11 +875,36 @@ export async function inspectDocs({ root }) {
       const result = inspectDiagnosis(doc, text, diagnosisSeverity(kind), await ensureAllFiles())
       diagnostics.push(...result.diagnostics)
       diagnoses.push(...result.codes)
+    } else if (kind.startsWith('plan-')) {
+      const result = inspectPlan(doc, text, kind)
+      diagnostics.push(...result.diagnostics)
+      plans.push(...result.entries)
     } else {
       diagnostics.push(...validateDocument(doc, text, kind))
     }
     if (kind === 'file' && relative === EXPECTED_DOCS[0]) {
       diagnostics.push(...fileCoverage(text, await ensureProjectFiles()))
+    }
+  }
+
+  const planRank = (entry) => (entry.kind === 'todo' ? 0 : 2) + (entry.archived ? 1 : 0)
+  plans.sort((a, b) => planRank(a) - planRank(b) || a.line - b.line)
+
+  const planCodes = new Map()
+  for (const entry of plans) {
+    const key = `${entry.kind}:${entry.code}`
+    const previous = planCodes.get(key)
+    if (previous === undefined) {
+      planCodes.set(key, entry)
+    } else if (previous.archived !== entry.archived) {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'plan.code.archived-duplicate',
+          `${entry.code} 同时出现在 ${previous.doc} 与 ${entry.doc}；完成的任务只保留在归档文档中。`,
+        ),
+      )
     }
   }
 
@@ -936,6 +982,7 @@ export async function inspectDocs({ root }) {
     missing: missing.length,
     diagnostics: diagnostics.length,
     codes: diagnoses.length,
+    plans: plans.length,
     locked: lock !== null,
   }
   const ok = illegal.length === 0 && missing.length === 0 && diagnostics.length === 0
@@ -950,6 +997,7 @@ export async function inspectDocs({ root }) {
     missing,
     diagnostics,
     diagnoses,
+    plans,
     lock,
     summary,
   }
