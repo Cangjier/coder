@@ -11,15 +11,19 @@ bundle 补丁：插入 id 为 coder 的 Host 插件行。
 # src
 源码目录。
 ## src/docs.js
-文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份文档的确定性检查。
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份设计文档和两份诊断文档的确定性检查，并汇总诊断码作用范围。
 ## src/glob.js
 通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
+## src/markdown.js
+Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
+## src/diagnosis.js
+诊断文档：解析 error.md / warn.md，校验诊断码、作用范围、诊断方式、步骤格式与编号，并检查文件通配命中。
 ## src/lock.js
 锁文件：lock.md 的格式解析、.coder hash 计算与读写。
 ## src/git.js
 update 的 git 操作：提交指定文件、checkpoint 与新建分支。
 ## src/render.js
-HTML 渲染：把四份文档写成单页 design.html。
+HTML 渲染：把六份预期文档写成单页 design.html。
 # src/tools
 工具定义目录。
 ## src/tools/list.js
@@ -35,7 +39,9 @@ HTML 渲染：把四份文档写成单页 design.html。
 # tests
 测试目录。
 ## tests/docs.test.js
-覆盖扫描、缺失、非法、文件覆盖与四份文档的格式诊断。
+覆盖扫描、缺失、非法、文件覆盖与六份文档的格式诊断。
+## tests/diagnosis.test.js
+覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。
 ## tests/glob.test.js
 覆盖 *、**、? 与 tmp/** 的匹配行为。
 ## tests/plugin.test.js

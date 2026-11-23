@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到两个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到五个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -25,6 +25,8 @@ flowchart TB
     arch["architecture.md 校验"]
     flow["flow.md 校验"]
     data["data_structure.md 校验"]
+    diag["诊断码校验"]
+    scope["作用范围命中"]
     lockHash["lock.md hash 校验"]
     report["报告汇总"]
   end
@@ -41,6 +43,7 @@ flowchart TB
   工具层 --> 提交层
   扫描层 --> 诊断层
   锁层 --> 诊断层
+  诊断层 --> report
 ```
 
 ## 局部视角：文档扫描
@@ -64,6 +67,21 @@ flowchart LR
   B --> C[排除 .coder]
   C --> D[通配匹配]
   D --> E[未覆盖文件]
+```
+
+## 局部视角：诊断码
+只回答「error.md / warn.md 如何被解析和检查」：编码、作用范围、诊断方式、步骤格式和文件通配命中。
+
+```mermaid
+flowchart LR
+  A[读取 error.md / warn.md] --> B[解析 # E0001 / # W0001]
+  B --> C[校验前缀与 4 位数字]
+  C --> D[校验作用范围、诊断方式与步骤格式]
+  D --> E{作用范围是通配?}
+  E -- 是 --> F[匹配项目文件并要求至少命中一个]
+  E -- 否 --> G[全局范围]
+  F --> H[写入 diagnoses]
+  G --> H
 ```
 
 ## 局部视角：数据结构
@@ -99,7 +117,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取四份文档]
+  A[render 调用] --> B[读取六份预期文档]
   B --> C[汇总诊断]
   C --> D[生成 HTML]
   D --> E[写入 dist/.coder/design.html]

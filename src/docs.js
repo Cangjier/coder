@@ -5,9 +5,10 @@
  * `<root>/.coder/` 下的文件全部列出来，与预期集合比对，再按
  * `docs/design.md` 的格式约定逐份诊断。
  *
- * 四份设计文档的规则都以「确定性」为前提，所以只做能够机械判定的检查：
- * 标题路径是否合法、同一路径是否重复、说明是否为空、是否有反向表述、
- * 视角是否有图、场景是否有 mermaid 图、数据结构是否用 ts interface 表达。
+ * 四份设计文档和两份诊断文档的规则都以「确定性」为前提，所以只做能够
+ * 机械判定的检查：标题路径是否合法、同一路径是否重复、说明是否为空、
+ * 是否有反向表述、视角是否有图、场景是否有 mermaid 图、数据结构是否用
+ * ts interface 表达、诊断码与作用范围是否合法、步骤格式与编号、文件通配范围是否命中。
  * 判不了的（例如图是否真的描述了代码）不猜，也不报。
  *
  * 文档目录、预期文档和格式规则都是固化的，不接受配置。
@@ -18,8 +19,12 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
+import { DIAGNOSIS_DOCS, diagnosisSeverity, inspectDiagnosis } from './diagnosis.js'
 import { matchGlob } from './glob.js'
 import { LOCK_DECLARATION, LOCK_RELATIVE, hashCoder, readLock } from './lock.js'
+import { analyzeMarkdown } from './markdown.js'
+
+export { analyzeMarkdown }
 
 /** 文档树目录，相对于项目根目录。固化，不提供配置。 */
 export const DOCS_DIR = '.coder'
@@ -30,6 +35,7 @@ export const EXPECTED_DOCS = Object.freeze([
   'design/architecture.md',
   'design/flow.md',
   'design/data_structure.md',
+  ...DIAGNOSIS_DOCS,
 ])
 
 /** 会被当作 Markdown 诊断的扩展名。 */
@@ -55,12 +61,15 @@ export class CoderError extends Error {
 /**
  * 根据文档路径推断它属于哪一类格式。
  *
- * 用 basename 判断，而不是完整相对路径：诊断规则跟着文件名走。
+ * 设计文档用 basename 判断；诊断文档按完整相对路径判断，避免其他目录里
+ * 同名的 error.md / warn.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
- * @returns {'file'|'architecture'|'flow'|'data'|'lock'|'generic'} 文档类型。
+ * @returns {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'lock'|'generic'} 文档类型。
  */
 export function kindOf(relative) {
+  if (relative === 'diagnosis/error.md') return 'diagnosis-error'
+  if (relative === 'diagnosis/warn.md') return 'diagnosis-warn'
   const base = path.posix.basename(relative).toLowerCase()
   if (base === 'file.md') return 'file'
   if (base === 'architecture.md') return 'architecture'
@@ -93,70 +102,6 @@ function stripInlineCode(text) {
   const trimmed = text.trim()
   const match = /^`([^`]+)`$/.exec(trimmed)
   return match ? match[1].trim() : trimmed
-}
-
-/**
- * 把一个 Markdown 文本切成标题、围栏和行。
- *
- * 只承认 ATX 标题（`#` 到 `######`）和反引号/波浪号围栏。围栏里的 `#`
- * 不是标题，这是扫描 `mermaid` 图时最关键的一点。
- *
- * @param {string} text - 文档正文。
- * @returns {{lines: string[], headings: {level: number, text: string, line: number}[], fences: {startLine: number, endLine: number, lang: string, content: string}[], masked: boolean[], unclosed: {startLine: number, lang: string}|null}} 解析结果。
- */
-export function analyzeMarkdown(text) {
-  const lines = text.split(/\r?\n/)
-  const headings = []
-  const fences = []
-  const masked = new Array(lines.length).fill(false)
-  let open = null
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-
-    if (open !== null) {
-      masked[index] = true
-      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line)
-      if (close !== null && close[1][0] === open.char && close[1].length >= open.length) {
-        fences.push({
-          startLine: open.startLine,
-          endLine: index + 1,
-          lang: open.lang,
-          content: open.content.join('\n'),
-        })
-        open = null
-      } else {
-        open.content.push(line)
-      }
-      continue
-    }
-
-    const fenceOpen = /^\s*(`{3,}|~{3,})\s*([^\s`]*)?\s*$/.exec(line)
-    if (fenceOpen !== null) {
-      masked[index] = true
-      open = {
-        char: fenceOpen[1][0],
-        length: fenceOpen[1].length,
-        lang: (fenceOpen[2] ?? '').toLowerCase(),
-        startLine: index + 1,
-        content: [],
-      }
-      continue
-    }
-
-    const heading = /^(#{1,6})\s+(.*?)\s*$/.exec(line)
-    if (heading !== null && heading[2].trim() !== '') {
-      headings.push({ level: heading[1].length, text: heading[2].trim(), line: index + 1 })
-    }
-  }
-
-  return {
-    lines,
-    headings,
-    fences,
-    masked,
-    unclosed: open === null ? null : { startLine: open.startLine, lang: open.lang },
-  }
 }
 
 /**
@@ -649,10 +594,15 @@ function validateFlow(doc, analysis) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文档正文。
- * @param {'file'|'architecture'|'flow'|'data'|'lock'|'generic'} kind - 文档类型。
+ * @param {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'lock'|'generic'} kind - 文档类型。
+ * @param {string[]} [files] - 项目文件；诊断文档用它检查文件通配范围。
  * @returns {object[]} 诊断。
  */
-export function validateDocument(doc, text, kind) {
+export function validateDocument(doc, text, kind, files) {
+  if (kind === 'diagnosis-error' || kind === 'diagnosis-warn') {
+    return inspectDiagnosis(doc, text, diagnosisSeverity(kind), files).diagnostics
+  }
+
   const diagnostics = []
   if (text.trim() === '') {
     diagnostics.push(diagnostic(doc, 1, 'doc.empty', '文档是空的。'))
@@ -761,6 +711,20 @@ function formatReport(report) {
             : '[missing]'
     lines.push(`  ${marker} ${document.path}`)
   }
+  if (report.diagnoses.length > 0) {
+    lines.push('')
+    lines.push('诊断码：')
+    for (const item of report.diagnoses) {
+      const scope =
+        item.scopeKind === 'global'
+          ? '全局'
+          : item.scopeKind === 'glob'
+            ? `${item.scope}（命中 ${item.matches ?? '未检查'} 个文件）`
+            : '作用范围无效'
+      const method = item.method ?? '诊断方式无效'
+      lines.push(`  ${item.code} [${item.severity}] ${scope}｜诊断方式 ${method}｜步骤 ${item.steps.length}`)
+    }
+  }
   if (report.diagnostics.length > 0) {
     lines.push('')
     lines.push('诊断：')
@@ -792,9 +756,11 @@ export async function inspectDocs({ root }) {
 
   const docsRoot = path.resolve(absoluteRoot, DOCS_DIR)
   const diagnostics = []
+  const diagnoses = []
   let docsRootExists = false
   let discovered = []
   let projectFiles = null
+  let allFiles = null
 
   const docsRootStat = await fs.stat(docsRoot).catch((error) => {
     if (error && error.code === 'ENOENT') return null
@@ -850,6 +816,28 @@ export async function inspectDocs({ root }) {
     })
   }
 
+  async function ensureProjectFiles() {
+    if (projectFiles === null) {
+      try {
+        projectFiles = await walkProject(absoluteRoot)
+      } catch (error) {
+        throw new CoderError(
+          `无法列出 ${absoluteRoot} 的文件：${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }
+    return projectFiles
+  }
+
+  async function ensureAllFiles() {
+    if (allFiles === null) {
+      const project = await ensureProjectFiles()
+      const docs = discovered.map((relative) => `${DOCS_DIR}/${relative}`)
+      allFiles = [...new Set([...project, ...docs])].sort((a, b) => a.localeCompare(b))
+    }
+    return allFiles
+  }
+
   for (const relative of discovered) {
     if (!MARKDOWN_EXTENSION.test(relative) || relative === LOCK_RELATIVE) continue
     const doc = displayPath(relative)
@@ -862,18 +850,15 @@ export async function inspectDocs({ root }) {
     })
     if (text === null) continue
     const kind = kindOf(relative)
-    diagnostics.push(...validateDocument(doc, text, kind))
+    if (kind === 'diagnosis-error' || kind === 'diagnosis-warn') {
+      const result = inspectDiagnosis(doc, text, diagnosisSeverity(kind), await ensureAllFiles())
+      diagnostics.push(...result.diagnostics)
+      diagnoses.push(...result.codes)
+    } else {
+      diagnostics.push(...validateDocument(doc, text, kind))
+    }
     if (kind === 'file' && relative === EXPECTED_DOCS[0]) {
-      if (projectFiles === null) {
-        try {
-          projectFiles = await walkProject(absoluteRoot)
-        } catch (error) {
-          throw new CoderError(
-            `无法列出 ${absoluteRoot} 的文件：${error instanceof Error ? error.message : String(error)}`,
-          )
-        }
-      }
-      diagnostics.push(...fileCoverage(text, projectFiles))
+      diagnostics.push(...fileCoverage(text, await ensureProjectFiles()))
     }
   }
 
@@ -950,6 +935,7 @@ export async function inspectDocs({ root }) {
     illegal: illegal.length,
     missing: missing.length,
     diagnostics: diagnostics.length,
+    codes: diagnoses.length,
     locked: lock !== null,
   }
   const ok = illegal.length === 0 && missing.length === 0 && diagnostics.length === 0
@@ -963,6 +949,7 @@ export async function inspectDocs({ root }) {
     illegal,
     missing,
     diagnostics,
+    diagnoses,
     lock,
     summary,
   }

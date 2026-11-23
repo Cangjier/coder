@@ -43,6 +43,23 @@ flowchart TD
 \`\`\`
 `
 
+const ERROR_OK = `# E0001
+作用范围：全局
+诊断方式：静态代码审查
+步骤1：查看 [**] 入口代码，如果缺少导出，则认定为 E0001，否则继续。
+步骤2：查看 [**] 注册代码，如果工具未注册，则认定为 E0001，否则继续。
+`
+
+const WARN_OK = `# W0001
+作用范围：全局
+诊断方式：运行时日志审查
+步骤1：在 [**] 检查点，插入日志：
+\`\`\`ts
+console.log('warn')
+\`\`\`
+步骤2：查看日志，如果出现警告，则认定为 W0001，否则继续。
+`
+
 const DATA_OK = `# 数据结构
 ## 诊断
 说明。
@@ -73,10 +90,13 @@ after(() => {
 function writeProject(label = 'project') {
   const root = mkdtempSync(join(tempRoot, `${label}-`))
   mkdirSync(join(root, '.coder', 'design'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'diagnosis'), { recursive: true })
   writeFileSync(join(root, '.coder', 'design', 'file.md'), FILE_OK)
   writeFileSync(join(root, '.coder', 'design', 'architecture.md'), ARCHITECTURE_OK)
   writeFileSync(join(root, '.coder', 'design', 'flow.md'), FLOW_OK)
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
   return root
 }
 
@@ -96,7 +116,7 @@ describe('lock / unlock', () => {
     const result = await tool.execute({ root, authorization }, { cwd: root })
 
     assert.equal(result.locked, true)
-    assert.equal(result.files.length, 4)
+    assert.equal(result.files.length, 6)
     const lockText = readFileSync(join(root, '.coder', 'lock.md'), 'utf8')
     const lines = lockText.split('\n')
     assert.equal(lines[0], LOCK_DECLARATION)

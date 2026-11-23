@@ -198,8 +198,8 @@ export function createUpdateTool(logger) {
   return {
     name: 'update',
     description: [
-      'Replace .coder/design documents with source files staged under tmp/.',
-      'updates is a non-empty array of { source, target }: source must be a file under the project tmp/ directory, and target must be one of .coder/design/file.md, architecture.md, flow.md, data_structure.md.',
+      'Replace .coder/ design or diagnosis documents with source files staged under tmp/.',
+      'updates is a non-empty array of { source, target }: source must be a file under the project tmp/ directory, and target must be one of the expected documents: .coder/design/file.md, architecture.md, flow.md, data_structure.md, .coder/diagnosis/error.md, .coder/diagnosis/warn.md.',
       'Without a lock, update replaces the targets directly, returns a warning that the tree is unlocked and that update is intended for process changes, and makes no commit.',
       'While locked, update checks the lock hash on every call and refuses on a mismatch. The first call (no key) validates input, generates a random key, and returns a plan without modifying files: dsh must start a subagent to review the tmp sources and decide supplement or adjustment. The second call passes the same updates, the key, decision (supplement or adjustment), and review (the original user authorization text). It re-checks the lock hash and source hashes, replaces the files, updates the lock hash, and commits.',
       'supplement commits on the current branch. adjustment first commits the current working tree as a checkpoint, then creates the new branch named by the second call\'s branch argument, then replaces, hashes, and commits. The second adjustment call must pass branch; the second supplement call must omit it. No push and no complex rollback: git and the fs sandbox are the backstop.',
@@ -215,7 +215,7 @@ export function createUpdateTool(logger) {
         updates: {
           type: 'array',
           description:
-            'Files to replace. Each item maps a tmp/ source file to one .coder/design target file.',
+            'Files to replace. Each item maps a tmp/ source file to one expected .coder/ design or diagnosis target file.',
           items: {
             type: 'object',
             properties: {
@@ -226,7 +226,7 @@ export function createUpdateTool(logger) {
               target: {
                 type: 'string',
                 description:
-                  'Target design document: .coder/design/file.md, architecture.md, flow.md, or data_structure.md.',
+                  'Target document: .coder/design/file.md, architecture.md, flow.md, data_structure.md, .coder/diagnosis/error.md, or warn.md.',
               },
             },
             required: ['source', 'target'],

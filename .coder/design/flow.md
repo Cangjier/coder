@@ -18,6 +18,25 @@ flowchart LR
   C --> D[逐项通配匹配]
   D --> E[未覆盖文件]
 ```
+## 检查诊断码
+在 list 时解析 error.md 和 warn.md，校验编码、作用范围、诊断方式、步骤格式与编号；作用范围是文件通配时，以及步骤里的文件通配，都必须至少命中一个项目文件。
+
+```mermaid
+flowchart TD
+  A[读取诊断文档] --> B[按 # 分段解析诊断码]
+  B --> C[校验 E/W 前缀与 4 位数字]
+  C --> D[读取作用范围]
+  D --> E{全局还是通配?}
+  E -- 全局 --> F[记录全局诊断码]
+  E -- 通配 --> G[用项目文件匹配]
+  G --> H{至少命中一个?}
+  H -- 否 --> I[报 diagnosis.scope.no-match]
+  H -- 是 --> J[记录命中数]
+  F --> K[校验诊断方式、步骤格式与编号]
+  I --> K
+  J --> K
+  K --> L[写入 diagnoses]
+```
 ## 加载插件
 ```mermaid
 flowchart TD
@@ -54,7 +73,7 @@ flowchart TD
   B --> C[删除 .coder/lock.md]
   C --> D[返回 hashMatches]
 ```
-## 更新设计
+## 更新文档
 update 从 tmp/ 读取源文件；上锁时先审查、再带 key 和 decision 执行。
 
 ```mermaid
@@ -68,12 +87,12 @@ flowchart TD
   G -- 补充 --> H[替换 + 更新 hash + 提交]
   G -- 调整 --> I[checkpoint + 按 branch 新建分支 + 提交]
 ```
-## 渲染设计文档
-把四份文档渲染成一个 HTML 页面。
+## 渲染文档
+把六份预期文档渲染成一个 HTML 页面。
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取 .coder/design]
+  A[render 调用] --> B[读取 .coder/design 与 .coder/diagnosis]
   B --> C[汇总诊断]
   C --> D[生成 HTML]
   D --> E[写入 dist/.coder]

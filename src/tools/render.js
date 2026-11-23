@@ -1,8 +1,8 @@
 /**
  * `render` 工具定义。
  *
- * 把 `.coder/design/` 的四份文档渲染成一个 HTML 页面，默认写到
- * `dist/.coder/design.html`。工具只写这一个文件，不改设计文档。
+ * 把 `.coder/` 的预期文档（四份设计文档与两份诊断文档）渲染成一个 HTML
+ * 页面，默认写到 `dist/.coder/design.html`。工具只写这一个文件，不改文档。
  *
  * @module coder/tools/render
  */
@@ -21,10 +21,10 @@ export function createRenderTool(logger) {
   return {
     name: 'render',
     description: [
-      'Render the .coder/design Markdown documents into one design.html page.',
+      'Render the .coder/ design and diagnosis Markdown documents into one design.html page.',
       'By default the page is written to dist/.coder/design.html; pass "out" to choose another output directory. The file name is always design.html.',
-      'The page embeds the documents: file.md becomes a collapsible tree table with indentation guides, architecture.md and flow.md become Markdown with Mermaid diagrams, data_structure.md becomes Markdown with TypeScript blocks, and the left sidebar is a table of contents. The page shows no extra status or hint copy. Markdown is rendered with marked and Mermaid diagrams with mermaid, both loaded from jsDelivr in the browser; without the CDN the page falls back to the Markdown source.',
-      'Read-only with respect to the design documents: it writes only the HTML page. The output is deterministic for the same documents; it returns the absolute output path, the byte size, and the current document status.',
+      'The page embeds the documents: file.md becomes a collapsible tree table with indentation guides, architecture.md and flow.md become Markdown with Mermaid diagrams, data_structure.md becomes Markdown with TypeScript blocks, and error.md / warn.md become Markdown diagnosis-code catalogues. The left sidebar is a table of contents. The page shows no extra status or hint copy. Markdown is rendered with marked and Mermaid diagrams with mermaid, both loaded from jsDelivr in the browser; without the CDN the page falls back to the Markdown source.',
+      'Read-only with respect to the documents: it writes only the HTML page. The output is deterministic for the same documents; it returns the absolute output path, the byte size, and the current document status.',
     ].join(' '),
     parameters: {
       type: 'object',

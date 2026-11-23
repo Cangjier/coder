@@ -2,7 +2,7 @@ coder 的设计目标是提供一系列确定性工具，驱动 dsh 实现符合
 
 # DESIGN
 
-设计文档主要在 `.coder/design/` 下，包括 `file.md`、`architecture.md`、`flow.md`、`data_structure.md`。
+设计文档在 `.coder/design/` 下，包括 `file.md`、`architecture.md`、`flow.md`、`data_structure.md`；诊断文档在 `.coder/diagnosis/` 下，包括 `error.md` 和 `warn.md`。
 
 ## file.md
 
@@ -47,9 +47,57 @@ coder 的设计目标是提供一系列确定性工具，驱动 dsh 实现符合
 
 描述关键数据结构，用 `ts` 围栏和 TypeScript `interface` 表达。只记录跨模块传递的关键结构；解析器内部的行、围栏等中间结构留在代码里。
 
+## diagnosis/error.md 与 warn.md
+
+诊断文档描述项目自己的诊断码。
+
+```md
+# E0001
+
+作用范围：全局
+
+诊断方式：静态代码审查
+
+步骤1：查看 [src/**] 入口代码，如果缺少导出，则认定为 E0001，否则继续。
+
+步骤2：查看 [src/**] 注册代码，如果未注册，则认定为 E0001，否则继续。
+```
+
+运行时诊断使用日志审查，步骤里插入 `ts` 伪代码，再查看日志：
+
+````md
+# E0002
+
+作用范围：全局
+
+诊断方式：运行时日志审查
+
+步骤1：在 [src/**] 校验处，插入日志：
+
+```ts
+console.log({ recorded, current })
+```
+
+步骤2：查看日志，如果 recorded 与 current 不一致，则认定为 E0002，否则继续。
+````
+
+- `error.md` 的诊断码以 `E` 开头，`warn.md` 的诊断码以 `W` 开头。
+- 数字部分固定 4 位，所以合法形式是 `E0001`、`W0001`；`E001`、`E00001`、`e0001` 都不合法。
+- `作用范围` 只能是 `全局`，或相对于项目根目录的文件路径通配；通配写法与 `file.md` 相同。
+- 每个诊断码恰好有一个 `诊断方式：静态代码审查` 或 `诊断方式：运行时日志审查`。
+- 静态代码审查的每个步骤必须写成：
+  `步骤N：查看 [文件通配] 代码位置描述，如果 ...，则 ...，否则 ...`
+- 运行时日志审查的步骤有两种：
+  - `步骤N：在 [文件通配] 代码位置描述，插入日志：`，后面紧跟一个非空的 `ts`/`typescript` 围栏；
+  - `步骤N：查看日志，如果 ...，则 ...，否则 ...`
+- 步骤编号从 `步骤1` 开始连续递增；同一种诊断方式下不允许跳号或重号。
+- 步骤里的文件通配由 `list` 校验；作用范围是文件通配时，也要求至少命中一个项目文件。
+- 诊断文档只用 `#` 写诊断码；作用范围、诊断方式和步骤都写成普通行，第一个诊断码之前不能有正文。
+- 步骤内容是自然语言，`list` 检查格式、编号、通配命中和日志围栏，不执行步骤，也不判断步骤是否足够详细。
+
 ## lock.md
 
-`.coder/lock.md` 是锁状态文件，不是预期设计文档，`render` 不渲染它。
+`.coder/lock.md` 是锁状态文件，不是预期文档，`render` 不渲染它。
 
 - 第一行是固定声明：`.coder 被上锁，禁止直接修改文件，修改必须走 update。`
 - 第二行是 `sha256:<hex>`：递归遍历 `.coder/` 下除 `lock.md` 外的所有文件，按相对路径排序，逐个计算内容 sha256，把 hex 直接拼接后再计算 sha256。
@@ -61,7 +109,7 @@ coder 的设计目标是提供一系列确定性工具，驱动 dsh 实现符合
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档不在预期之内且不是 `lock.md`，则提示该文档为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`data_structure.md` 会按 `##` 分段检查 `ts` 围栏和 `interface` 声明。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档不在预期之内且不是 `lock.md`，则提示该文档为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`data_structure.md` 会按 `##` 分段检查 `ts` 围栏和 `interface` 声明。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
 ### 预期文档
 
@@ -71,6 +119,8 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 | `.coder/design/architecture.md` | 多视角架构图 |
 | `.coder/design/flow.md` | 主要场景流程 |
 | `.coder/design/data_structure.md` | 关键数据结构 |
+| `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
+| `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
 
 `.coder/lock.md` 是唯一的非预期白名单文件，状态为 `lock`，不计入预期文档，也不渲染。预期文档集合是固化的，不接受配置。
 
@@ -110,6 +160,25 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 - 每个 `ts` 围栏至少有一个 `interface <名称>` 声明；全篇的 interface 名称唯一。
 - 只描述跨模块的关键结构；局部临时结构留在代码里。
 
+#### diagnosis/error.md 与 warn.md
+
+- 文档由一级标题的诊断码组成，例如 `# E0001`；`error.md` 只允许 `E\d{4}`，`warn.md` 只允许 `W\d{4}`。
+- 同一份文档里诊断码不能重复。
+- 每个诊断码必须有一个 `作用范围：全局` 或 `作用范围：<文件路径通配>`，且写在诊断方式和步骤之前。
+- 每个诊断码必须有一个 `诊断方式：静态代码审查` 或 `诊断方式：运行时日志审查`，且写在步骤之前。
+- 静态代码审查的步骤必须匹配：
+  `步骤N：查看 [文件通配] 代码位置描述，如果 ...，则 ...，否则 ...`
+- 运行时日志审查的步骤必须是以下两种之一：
+  - `步骤N：在 [文件通配] 代码位置描述，插入日志：`，后面紧跟一个非空的 `ts`/`typescript` 代码围栏；
+  - `步骤N：查看日志，如果 ...，则 ...，否则 ...`
+- 步骤编号从 `步骤1` 开始连续递增；跳号或重号报 `diagnosis.step.number`。
+- 步骤里的文件通配必须合法，并至少命中一个项目文件；否则报 `diagnosis.step.glob` 或 `diagnosis.step.no-match`。
+- 插入日志缺少 `ts` 围栏报 `diagnosis.step.log-missing`；围栏语言不是 `ts`/`typescript` 报 `diagnosis.step.log-lang`；内容为空报 `diagnosis.step.log-empty`。
+- 诊断文档只用 `#` 写诊断码；`##` 标题报 `diagnosis.heading.level`，其他正文行报 `diagnosis.body`。
+- 第一个诊断码之前不能有正文。
+- 作用范围、诊断方式和每个步骤之间空一行，Markdown 才会逐行显示。
+- 步骤内容是自然语言，`list` 只检查格式、编号、通配命中和日志围栏，不执行步骤，也不判断步骤是否足够详细。
+
 #### lock.md
 
 - 第一行必须与固定声明逐字一致，否则报 `lock.declaration`。
@@ -127,17 +196,19 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 - `lock`：`present`、`declarationValid`、`hash`、`hashMatches`、`currentHash`、`authorizationLength`；未上锁时为 `null`。
 - `summary.locked`：是否存在 `lock.md`。
 - `diagnostics`：每条诊断包含 `doc`、`line`（能定位时）、`rule` 与 `message`。
+- `diagnoses`：两份诊断文档里解析出的诊断码，包含 `code`、`severity`、`scope`、`scopeKind`、`method`、`steps`、`matches`。
+- `summary.codes`：解析出的诊断码数量。
 - `ok`：没有非法文档、没有缺失文档、也没有任何诊断时为 `true`。
 
 ## render
 
-`render` 把 `.coder/design/` 的四份文档渲染成一个 `design.html`。
+`render` 把 `.coder/` 的六份预期文档渲染成一个 `design.html`。
 
 - 默认输出目录：`dist/.coder/`；文件名固定 `design.html`。
 - 调用参数 `out` 可以指定另一个输出目录。
-- 页面内嵌四份文档；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，左侧是目录。
+- 页面内嵌六份文档；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，左侧是目录。
 - 页面不显示额外的状态或提示文案。
-- 页面在服务端预置四份文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
+- 页面在服务端预置六份文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
 - Markdown 由 marked 渲染，Mermaid 图由 mermaid 渲染，两者从 jsDelivr 加载。
 - CDN 不可用时保留源码正文与图表源码。
 - 同样的文档得到同样的 HTML：不写时间戳，不读环境信息。
@@ -162,13 +233,13 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 
 ## update
 
-`update` 用 `tmp/` 下的源文件替换 `.coder/design/` 的预期文档。
+`update` 用 `tmp/` 下的源文件替换 `.coder/` 的预期文档。
 
 输入 `updates` 是非空数组，每项 `{ source, target }`：
 
 - `source` 必须位于项目根目录的 `tmp/` 下，是普通文件，使用 `/` 分隔。
 - 使用 git 的项目在 file.md 中用 `# .git/**` 覆盖 git 目录，用 `# tmp/**` 覆盖暂存目录，避免覆盖检查把这些文件报成未描述。
-- `target` 必须是 `.coder/design/file.md`、`architecture.md`、`flow.md` 或 `data_structure.md` 之一，并且已经存在、是普通文件。
+- `target` 必须是 `.coder/design/file.md`、`architecture.md`、`flow.md`、`data_structure.md`、`.coder/diagnosis/error.md` 或 `warn.md` 之一，并且已经存在、是普通文件。
 - 同一目标只能出现一次。
 
 ### 未上锁

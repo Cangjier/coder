@@ -1,5 +1,5 @@
 /**
- * 把 `.coder/design/` 的四份文档渲染成一个 `design.html`。
+ * 把 `.coder/` 的预期文档渲染成一个 `design.html`。
  *
  * 页面只表达文档本身：
  *
@@ -7,10 +7,11 @@
  * - file.md 渲染成树表格；
  * - architecture.md / flow.md 渲染成 Markdown，Mermaid 图由浏览器绘制；
  * - data_structure.md 渲染成 Markdown，TypeScript 代码块按原文展示；
+ * - diagnosis/error.md 与 warn.md 渲染成 Markdown 诊断码目录；
  * - 不显示状态卡、页脚、说明文案或回退提示。
  *
  * Markdown 由 `marked` 渲染，Mermaid 由 `mermaid` 渲染，两者从 jsDelivr
- * 加载。页面在服务端预置四份文档的源码：脚本不可用时它就是可读的正文；
+ * 加载。页面在服务端预置全部预期文档的源码：脚本不可用时它就是可读的正文；
  * 脚本可用时升级为树表格 / Markdown / Mermaid。CDN 不可用时保留源码。
  *
  * 这里不生成时间戳，也不读环境信息：同样的文档永远得到同样的 HTML。
@@ -48,10 +49,10 @@ function escapeHtml(value) {
 /**
  * 服务端预置的文档区块。
  *
- * 脚本不可用时，这就是页面正文：四份文档以纯文本呈现，至少可读；
+ * 脚本不可用时，这就是页面正文：全部文档以纯文本呈现，至少可读；
  * 脚本可用时，前端把它替换成树表格 / Markdown / Mermaid。
  *
- * @param {{path: string, kind: string, present: boolean, content: string}[]} docs - 四份文档。
+ * @param {{path: string, kind: string, present: boolean, content: string}[]} docs - 全部预期文档。
  * @returns {string} 文档区块的 HTML。
  */
 function renderFallbackSections(docs) {
@@ -67,9 +68,9 @@ function renderFallbackSections(docs) {
 }
 
 /**
- * 服务端预置的目录，只列四份文档；前端会在此基础上补文档内标题。
+ * 服务端预置的目录，列出全部预期文档；前端会在此基础上补文档内标题。
  *
- * @param {{path: string, kind: string}[]} docs - 四份文档。
+ * @param {{path: string, kind: string}[]} docs - 全部预期文档。
  * @returns {string} 目录的 HTML。
  */
 function renderStaticNav(docs) {
@@ -83,7 +84,7 @@ function renderStaticNav(docs) {
  * 构造单页 HTML。
  *
  * @param {object} input - 输入。
- * @param {{path: string, kind: string, present: boolean, content: string}[]} input.docs - 四份文档。
+ * @param {{path: string, kind: string, present: boolean, content: string}[]} input.docs - 全部预期文档。
  * @returns {string} HTML 文本。
  */
 function buildHtml({ docs }) {
@@ -556,7 +557,8 @@ ${renderFallbackSections(docs)}
     var body = document.createElement('div')
     body.className = 'markdown'
     try {
-      body.innerHTML = window.marked.parse(doc.content, { gfm: true })
+      var diagnosis = doc.kind === 'diagnosis-error' || doc.kind === 'diagnosis-warn'
+      body.innerHTML = window.marked.parse(doc.content, { gfm: true, breaks: diagnosis })
     } catch (error) {
       return
     }

@@ -1,6 +1,6 @@
 # 数据结构
 
-只记录跨模块传递的关键结构：诊断、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/docs.js` 自己维护。
+只记录跨模块传递的关键结构：诊断、诊断码、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
 
 ## 诊断
 
@@ -22,12 +22,64 @@ export interface Diagnostic {
 }
 ```
 
+## 诊断码
+
+诊断文档解析出的诊断码；`list` 用它展示编码、作用范围、诊断方式、步骤和文件通配命中数。
+
+```ts
+export type DiagnosisSeverity = 'error' | 'warn'
+
+export type DiagnosisMethod = '静态代码审查' | '运行时日志审查'
+
+export type DiagnosisStepKind = '静态' | '插入日志' | '查看日志'
+
+export interface DiagnosisStep {
+  /** 步骤N 的 N */
+  number: number
+  /** 步骤所在行 */
+  line: number
+  kind: DiagnosisStepKind
+  /** 步骤里的文件通配；查看日志步骤为 null */
+  glob: string | null
+  /** 文件通配命中的项目文件数；全局或未检查时为 null */
+  matches: number | null
+  /** 插入日志步骤是否带了 ts 围栏 */
+  log: boolean
+}
+
+export interface DiagnosisCode {
+  /** 展示用文档路径，例如 .coder/diagnosis/error.md */
+  doc: string
+  /** 诊断码标题所在行 */
+  line: number
+  /** E0001 或 W0001 */
+  code: string
+  severity: DiagnosisSeverity
+  /** 全局或文件路径通配；作用范围无效时为 null */
+  scope: string | null
+  scopeKind: 'global' | 'glob' | null
+  /** 静态代码审查或运行时日志审查；无效时为 null */
+  method: DiagnosisMethod | null
+  steps: DiagnosisStep[]
+  /** 文件通配命中的项目文件数；全局或未检查时为 null */
+  matches: number | null
+}
+```
+
 ## 文档条目
 
 `.coder/` 下扫描到的每个文件都变成一条文档条目，预期、非法和缺失共用同一种形状。
 
 ```ts
-export type DocumentKind = 'file' | 'architecture' | 'flow' | 'data' | 'lock' | 'generic'
+export type DocumentKind =
+  | 'file'
+  | 'architecture'
+  | 'flow'
+  | 'data'
+  | 'diagnosis-error'
+  | 'diagnosis-warn'
+  | 'lock'
+  | 'generic'
 
 export type DocumentStatus = 'expected' | 'illegal' | 'missing' | 'lock'
 
@@ -61,6 +113,8 @@ export interface Summary {
   missing: number
   /** 诊断条数 */
   diagnostics: number
+  /** 解析出的诊断码数量 */
+  codes: number
   /** .coder/lock.md 是否存在 */
   locked: boolean
 }
@@ -79,6 +133,8 @@ export interface Report {
   /** 缺失文档的展示用路径 */
   missing: string[]
   diagnostics: Diagnostic[]
+  /** 两份诊断文档解析出的诊断码 */
+  diagnoses: DiagnosisCode[]
   summary: Summary
   /** 锁的状态；未上锁时为 null */
   lock: LockReport | null
@@ -89,7 +145,7 @@ export interface Report {
 
 ## 渲染
 
-渲染只接收四份文档的正文，输出页面路径、字节数和当前的检查状态。
+渲染接收六份预期文档的正文，输出页面路径、字节数和当前的检查状态。
 
 ```ts
 export interface RenderDocument {

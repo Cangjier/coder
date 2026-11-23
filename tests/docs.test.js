@@ -48,6 +48,23 @@ flowchart TD
 \`\`\`
 `
 
+const ERROR_OK = `# E0001
+作用范围：全局
+诊断方式：静态代码审查
+步骤1：查看 [**] 入口代码，如果缺少导出，则认定为 E0001，否则继续。
+步骤2：查看 [**] 注册代码，如果工具未注册，则认定为 E0001，否则继续。
+`
+
+const WARN_OK = `# W0001
+作用范围：全局
+诊断方式：运行时日志审查
+步骤1：在 [**] 检查点，插入日志：
+\`\`\`ts
+console.log('warn')
+\`\`\`
+步骤2：查看日志，如果出现警告，则认定为 W0001，否则继续。
+`
+
 const DATA_OK = `# 数据结构
 ## 诊断
 诊断条目。
@@ -102,6 +119,8 @@ function writeValidTree() {
     '.coder/design/architecture.md': ARCHITECTURE_OK,
     '.coder/design/flow.md': FLOW_OK,
     '.coder/design/data_structure.md': DATA_OK,
+    '.coder/diagnosis/error.md': ERROR_OK,
+    '.coder/diagnosis/warn.md': WARN_OK,
   })
 }
 
@@ -127,8 +146,8 @@ describe('inspectDocs', () => {
     assert.deepEqual(report.illegal, [])
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.diagnostics, [])
-    assert.equal(report.summary.expected, 4)
-    assert.equal(report.summary.found, 4)
+    assert.equal(report.summary.expected, 6)
+    assert.equal(report.summary.found, 6)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 
@@ -139,6 +158,8 @@ describe('inspectDocs', () => {
         '.coder/design/architecture.md': ARCHITECTURE_OK,
         '.coder/design/flow.md': FLOW_OK,
         '.coder/design/data_structure.md': DATA_OK,
+        '.coder/diagnosis/error.md': ERROR_OK,
+        '.coder/diagnosis/warn.md': WARN_OK,
         '.coder/design/extra.md': '# extra\n多余文档\n',
         '.coder/design/notes.txt': 'not markdown',
       }),
@@ -156,6 +177,8 @@ describe('inspectDocs', () => {
       '.coder/design/file.md': FILE_OK,
       '.coder/design/architecture.md': ARCHITECTURE_OK,
       '.coder/design/data_structure.md': DATA_OK,
+      '.coder/diagnosis/error.md': ERROR_OK,
+      '.coder/diagnosis/warn.md': WARN_OK,
     })
     const report = await inspect(root)
     assert.equal(report.ok, false)
@@ -168,7 +191,7 @@ describe('inspectDocs', () => {
     const root = mkdtempSync(join(tempRoot, 'empty-'))
     const report = await inspect(root)
     assert.equal(report.docsRootExists, false)
-    assert.equal(report.missing.length, 4)
+    assert.equal(report.missing.length, 6)
     assert.equal(report.ok, false)
     assert.match(report.text, /不存在/)
   })
@@ -186,6 +209,8 @@ describe('inspectDocs', () => {
       '.coder/design/architecture.md': ARCHITECTURE_OK,
       '.coder/design/flow.md': FLOW_OK,
       '.coder/design/data_structure.md': DATA_OK,
+      '.coder/diagnosis/error.md': ERROR_OK,
+      '.coder/diagnosis/warn.md': WARN_OK,
       'README.md': '# hello\n',
       'extra.txt': 'x',
     })
@@ -565,6 +590,8 @@ describe('fixed document set', () => {
     'design/architecture.md',
     'design/flow.md',
     'design/data_structure.md',
+    'diagnosis/error.md',
+    'diagnosis/warn.md',
   ])
   })
 })

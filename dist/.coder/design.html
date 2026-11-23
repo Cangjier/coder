@@ -231,18 +231,638 @@ a:hover { text-decoration: underline; }
 <div class="layout">
   <aside class="sidebar">
     <p class="nav-title">目录</p>
-    <nav id="nav" aria-label="目录"></nav>
+    <nav id="nav" aria-label="目录">
+  <ul class="toc">
+    <li><a href="#file">.coder/design/file.md</a></li>
+    <li><a href="#architecture">.coder/design/architecture.md</a></li>
+    <li><a href="#flow">.coder/design/flow.md</a></li>
+    <li><a href="#data">.coder/design/data_structure.md</a></li>
+    <li><a href="#diagnosis-error">.coder/diagnosis/error.md</a></li>
+    <li><a href="#diagnosis-warn">.coder/diagnosis/warn.md</a></li>
+  </ul>
+    </nav>
   </aside>
-  <main id="content"></main>
+  <main id="content">
+<section class="doc" id="file" data-doc="file">
+  <h2>.coder/design/file.md</h2>
+  <div class="markdown doc-fallback"><pre># index.js
+插件入口：导出 name、inject 与 apply，注册 `list`、`render`、`lock`、`unlock`、`update` 工具。
+# package.json
+包清单：声明 coder bundle、导出文件与测试脚本。
+# cordis.patch.yml
+bundle 补丁：插入 id 为 coder 的 Host 插件行。
+# README.md
+插件说明：检查目标、使用方式与固化约定。
+# icon.svg
+插件图标：文档与勾选标记。
+# src
+源码目录。
+## src/docs.js
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份设计文档和两份诊断文档的确定性检查，并汇总诊断码作用范围。
+## src/glob.js
+通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
+## src/markdown.js
+Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
+## src/diagnosis.js
+诊断文档：解析 error.md / warn.md，校验诊断码、作用范围、诊断方式、步骤格式与编号，并检查文件通配命中。
+## src/lock.js
+锁文件：lock.md 的格式解析、.coder hash 计算与读写。
+## src/git.js
+update 的 git 操作：提交指定文件、checkpoint 与新建分支。
+## src/render.js
+HTML 渲染：把六份预期文档写成单页 design.html。
+# src/tools
+工具定义目录。
+## src/tools/list.js
+`list` 工具：读取项目根目录、调用检查器、输出结构化报告与可读汇总。
+## src/tools/lock.js
+`lock` / `unlock` 工具：写入或删除 lock.md，处理授权原文。
+## src/tools/render.js
+`render` 工具：默认把 HTML 写到 dist/.coder/design.html。
+## src/tools/root.js
+所有工具共用的项目根目录解析。
+## src/tools/update.js
+`update` 工具：校验 tmp 源、上锁时分两步、替换并更新 hash，按 decision 提交。
+# tests
+测试目录。
+## tests/docs.test.js
+覆盖扫描、缺失、非法、文件覆盖与六份文档的格式诊断。
+## tests/diagnosis.test.js
+覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。
+## tests/glob.test.js
+覆盖 *、**、? 与 tmp/** 的匹配行为。
+## tests/plugin.test.js
+覆盖插件装配、工具注册与工具端到端调用。
+## tests/lock.test.js
+覆盖 lock/unlock、lock.md 格式、hash 比对与 list 诊断。
+## tests/render.test.js
+覆盖 HTML 生成、默认输出路径、缺失文档与确定性。
+## tests/update.test.js
+覆盖未上锁替换、上锁两步、key/review、补充提交、调整分支与 hash 校验。
+# docs
+插件设计文档目录。
+## docs/design.md
+coder 的设计说明：文档约定、list/render 行为与格式规则。
+# locale
+显示文案目录。
+## locale/en.json
+英文标题与描述。
+## locale/zh.json
+中文标题与描述。
+# dist/**
+渲染输出目录及生成文件。
+# tmp/**
+update 的源文件暂存目录。
+# .git/**
+git 元数据目录。
+</pre></div>
+</section>
+<section class="doc" id="architecture" data-doc="architecture">
+  <h2>.coder/design/architecture.md</h2>
+  <div class="markdown doc-fallback"><pre># 架构
+## 全局视角
+从 Host 的 tools 服务到五个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，render 复用扫描结果生成 HTML。
+
+```mermaid
+flowchart TB
+  subgraph 宿主层
+    cordis[&quot;Cordis 上下文&quot;]
+    tools[&quot;tools 服务&quot;]
+  end
+  subgraph 工具层
+    list[&quot;list 工具&quot;]
+    render[&quot;render 工具&quot;]
+    lock[&quot;lock 工具&quot;]
+    unlock[&quot;unlock 工具&quot;]
+    update[&quot;update 工具&quot;]
+  end
+  subgraph 扫描层
+    walk[&quot;目录遍历&quot;]
+    parse[&quot;Markdown 解析&quot;]
+  end
+  subgraph 诊断层
+    file[&quot;file.md 校验&quot;]
+    glob[&quot;通配匹配&quot;]
+    arch[&quot;architecture.md 校验&quot;]
+    flow[&quot;flow.md 校验&quot;]
+    data[&quot;data_structure.md 校验&quot;]
+    diag[&quot;诊断码校验&quot;]
+    scope[&quot;作用范围命中&quot;]
+    lockHash[&quot;lock.md hash 校验&quot;]
+    report[&quot;报告汇总&quot;]
+  end
+  subgraph 锁层
+    lockFile[&quot;lock.md&quot;]
+    hash[&quot;hash 计算&quot;]
+  end
+  subgraph 提交层
+    git[&quot;git commit / 分支&quot;]
+  end
+  宿主层 --&gt; 工具层
+  工具层 --&gt; 扫描层
+  工具层 --&gt; 锁层
+  工具层 --&gt; 提交层
+  扫描层 --&gt; 诊断层
+  锁层 --&gt; 诊断层
+  诊断层 --&gt; report
+```
+
+## 局部视角：文档扫描
+只回答「怎么发现文件、怎么比对预期文档」，不重复全局图的层。
+
+```mermaid
+flowchart LR
+  A[解析 root] --&gt; B[读取 .coder]
+  B --&gt; C[递归遍历]
+  C --&gt; D[相对路径集合]
+  D --&gt; E[比对预期文档]
+  E --&gt; F[缺失 / 非法]
+```
+
+## 局部视角：文件覆盖
+只回答「file.md 是否覆盖项目里的每个文件」，`.coder` 自身除外。
+
+```mermaid
+flowchart LR
+  A[读取 file.md 路径] --&gt; B[列出项目文件]
+  B --&gt; C[排除 .coder]
+  C --&gt; D[通配匹配]
+  D --&gt; E[未覆盖文件]
+```
+
+## 局部视角：诊断码
+只回答「error.md / warn.md 如何被解析和检查」：编码、作用范围、诊断方式、步骤格式和文件通配命中。
+
+```mermaid
+flowchart LR
+  A[读取 error.md / warn.md] --&gt; B[解析 # E0001 / # W0001]
+  B --&gt; C[校验前缀与 4 位数字]
+  C --&gt; D[校验作用范围、诊断方式与步骤格式]
+  D --&gt; E{作用范围是通配?}
+  E -- 是 --&gt; F[匹配项目文件并要求至少命中一个]
+  E -- 否 --&gt; G[全局范围]
+  F --&gt; H[写入 diagnoses]
+  G --&gt; H
+```
+
+## 局部视角：数据结构
+只回答「data_structure.md 如何被校验」：按 `##` 分段，每段读取 ts 围栏，提取 interface 名称并查重。
+
+```mermaid
+flowchart LR
+  A[读取 data_structure.md] --&gt; B[按 ## 分段]
+  B --&gt; C[收集 ts 围栏]
+  C --&gt; D[提取 interface]
+  D --&gt; E[空块 / 缺 interface / 重名]
+```
+
+## 局部视角：锁定与更新
+只回答「lock 如何约束修改、update 如何放行修改」；hash 计算复用全局图的锁层。
+
+```mermaid
+flowchart LR
+  A[lock] --&gt; B[计算 hash]
+  B --&gt; C[写 lock.md]
+  D[update] --&gt; E{已上锁?}
+  E -- 否 --&gt; F[直接替换，不提交]
+  E -- 是 --&gt; G{带 key?}
+  G -- 否 --&gt; H[返回 key 和审查计划]
+  G -- 是 --&gt; I[校验 hash / key / 源文件]
+  I --&gt; J{decision}
+  J -- 补充 --&gt; K[替换 + 更新 hash + 提交]
+  J -- 调整 --&gt; L[checkpoint + 新分支 + 替换 + 提交]
+```
+
+## 局部视角：渲染
+只回答「render 如何把文档变成 HTML」，扫描和诊断复用全局图。
+
+```mermaid
+flowchart LR
+  A[render 调用] --&gt; B[读取六份预期文档]
+  B --&gt; C[汇总诊断]
+  C --&gt; D[生成 HTML]
+  D --&gt; E[写入 dist/.coder/design.html]
+```
+</pre></div>
+</section>
+<section class="doc" id="flow" data-doc="flow">
+  <h2>.coder/design/flow.md</h2>
+  <div class="markdown doc-fallback"><pre># 流程
+## 检查项目文档
+```mermaid
+flowchart TD
+  A[list 调用] --&gt; B[解析 root]
+  B --&gt; C[扫描 .coder/ 文档树]
+  C --&gt; D[比对预期文档]
+  D --&gt; E[逐份格式诊断]
+  E --&gt; F[汇总报告]
+```
+## 检查文件覆盖
+用 file.md 的路径/通配检查项目里的每个文件。
+
+```mermaid
+flowchart LR
+  A[读取 file.md] --&gt; B[列出项目文件]
+  B --&gt; C[排除 .coder]
+  C --&gt; D[逐项通配匹配]
+  D --&gt; E[未覆盖文件]
+```
+## 检查诊断码
+在 list 时解析 error.md 和 warn.md，校验编码、作用范围、诊断方式、步骤格式与编号；作用范围是文件通配时，以及步骤里的文件通配，都必须至少命中一个项目文件。
+
+```mermaid
+flowchart TD
+  A[读取诊断文档] --&gt; B[按 # 分段解析诊断码]
+  B --&gt; C[校验 E/W 前缀与 4 位数字]
+  C --&gt; D[读取作用范围]
+  D --&gt; E{全局还是通配?}
+  E -- 全局 --&gt; F[记录全局诊断码]
+  E -- 通配 --&gt; G[用项目文件匹配]
+  G --&gt; H{至少命中一个?}
+  H -- 否 --&gt; I[报 diagnosis.scope.no-match]
+  H -- 是 --&gt; J[记录命中数]
+  F --&gt; K[校验诊断方式、步骤格式与编号]
+  I --&gt; K
+  J --&gt; K
+  K --&gt; L[写入 diagnoses]
+```
+## 加载插件
+```mermaid
+flowchart TD
+  A[加载 coder bundle] --&gt; B[执行 apply]
+  B --&gt; C[注册 list / render]
+  B --&gt; D[注册 lock / unlock]
+  B --&gt; E[注册 update]
+```
+## 检查数据结构
+按 `##` 分段检查 data_structure.md 的 ts 围栏和 interface 声明。
+
+```mermaid
+flowchart TD
+  A[读取 data_structure.md] --&gt; B[按 ## 分段]
+  B --&gt; C[收集 ts 围栏]
+  C --&gt; D[提取 interface]
+  D --&gt; E[记录诊断]
+```
+## 上锁
+lock 计算当前 .coder 的 hash，把声明、hash 和授权原文写进 lock.md。
+
+```mermaid
+flowchart TD
+  A[lock 调用] --&gt; B[计算 .coder hash]
+  B --&gt; C[写 .coder/lock.md]
+  C --&gt; D[返回锁状态]
+```
+## 解锁
+unlock 校验授权原文，删除 lock.md；hash 不一致时仍然解锁并报告。
+
+```mermaid
+flowchart TD
+  A[unlock 调用] --&gt; B[校验授权原文]
+  B --&gt; C[删除 .coder/lock.md]
+  C --&gt; D[返回 hashMatches]
+```
+## 更新文档
+update 从 tmp/ 读取源文件；上锁时先审查、再带 key 和 decision 执行。
+
+```mermaid
+flowchart TD
+  A[update 调用] --&gt; B{已上锁?}
+  B -- 否 --&gt; C[直接替换]
+  B -- 是 --&gt; D{带 key?}
+  D -- 否 --&gt; E[返回 key 和审查计划]
+  D -- 是 --&gt; F[校验 hash / key / 源文件]
+  F --&gt; G{decision}
+  G -- 补充 --&gt; H[替换 + 更新 hash + 提交]
+  G -- 调整 --&gt; I[checkpoint + 按 branch 新建分支 + 提交]
+```
+## 渲染文档
+把六份预期文档渲染成一个 HTML 页面。
+
+```mermaid
+flowchart LR
+  A[render 调用] --&gt; B[读取 .coder/design 与 .coder/diagnosis]
+  B --&gt; C[汇总诊断]
+  C --&gt; D[生成 HTML]
+  D --&gt; E[写入 dist/.coder]
+```
+</pre></div>
+</section>
+<section class="doc" id="data" data-doc="data">
+  <h2>.coder/design/data_structure.md</h2>
+  <div class="markdown doc-fallback"><pre># 数据结构
+
+只记录跨模块传递的关键结构：诊断、诊断码、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
+
+## 诊断
+
+`list` 和 `render` 都返回诊断；每条诊断能定位到文档和行，并带一个稳定的规则代码。
+
+```ts
+export type DiagnosticSeverity = &#39;error&#39;
+
+export interface Diagnostic {
+  /** 展示用文档路径，例如 .coder/design/file.md */
+  doc: string
+  /** 1-based 行号 */
+  line: number
+  /** 稳定规则代码，例如 file.coverage.missing */
+  rule: string
+  severity: DiagnosticSeverity
+  /** 给人看的原因与改法 */
+  message: string
+}
+```
+
+## 诊断码
+
+诊断文档解析出的诊断码；`list` 用它展示编码、作用范围、诊断方式、步骤和文件通配命中数。
+
+```ts
+export type DiagnosisSeverity = &#39;error&#39; | &#39;warn&#39;
+
+export type DiagnosisMethod = &#39;静态代码审查&#39; | &#39;运行时日志审查&#39;
+
+export type DiagnosisStepKind = &#39;静态&#39; | &#39;插入日志&#39; | &#39;查看日志&#39;
+
+export interface DiagnosisStep {
+  /** 步骤N 的 N */
+  number: number
+  /** 步骤所在行 */
+  line: number
+  kind: DiagnosisStepKind
+  /** 步骤里的文件通配；查看日志步骤为 null */
+  glob: string | null
+  /** 文件通配命中的项目文件数；全局或未检查时为 null */
+  matches: number | null
+  /** 插入日志步骤是否带了 ts 围栏 */
+  log: boolean
+}
+
+export interface DiagnosisCode {
+  /** 展示用文档路径，例如 .coder/diagnosis/error.md */
+  doc: string
+  /** 诊断码标题所在行 */
+  line: number
+  /** E0001 或 W0001 */
+  code: string
+  severity: DiagnosisSeverity
+  /** 全局或文件路径通配；作用范围无效时为 null */
+  scope: string | null
+  scopeKind: &#39;global&#39; | &#39;glob&#39; | null
+  /** 静态代码审查或运行时日志审查；无效时为 null */
+  method: DiagnosisMethod | null
+  steps: DiagnosisStep[]
+  /** 文件通配命中的项目文件数；全局或未检查时为 null */
+  matches: number | null
+}
+```
+
+## 文档条目
+
+`.coder/` 下扫描到的每个文件都变成一条文档条目，预期、非法和缺失共用同一种形状。
+
+```ts
+export type DocumentKind =
+  | &#39;file&#39;
+  | &#39;architecture&#39;
+  | &#39;flow&#39;
+  | &#39;data&#39;
+  | &#39;diagnosis-error&#39;
+  | &#39;diagnosis-warn&#39;
+  | &#39;lock&#39;
+  | &#39;generic&#39;
+
+export type DocumentStatus = &#39;expected&#39; | &#39;illegal&#39; | &#39;missing&#39; | &#39;lock&#39;
+
+export interface DocumentEntry {
+  /** 展示用路径，例如 .coder/design/flow.md */
+  path: string
+  /** 相对于 .coder/ 的路径，例如 design/flow.md */
+  relative: string
+  /** 绝对路径 */
+  absolute: string
+  status: DocumentStatus
+  /** 预期文档在磁盘上是否存在；非法文档为 true */
+  exists: boolean
+  kind: DocumentKind
+}
+```
+
+## 检查报告
+
+`list` 的返回值，也是 `render` 判断文档是否健康的依据。
+
+```ts
+export interface Summary {
+  /** 预期文档总数 */
+  expected: number
+  /** 找到的预期文档数 */
+  found: number
+  /** 非法文档数 */
+  illegal: number
+  /** 缺失文档数 */
+  missing: number
+  /** 诊断条数 */
+  diagnostics: number
+  /** 解析出的诊断码数量 */
+  codes: number
+  /** .coder/lock.md 是否存在 */
+  locked: boolean
+}
+
+export interface Report {
+  /** 没有非法文档、缺失文档和诊断时为 true */
+  ok: boolean
+  /** 项目根目录的绝对路径 */
+  root: string
+  /** .coder/ 的绝对路径 */
+  docsRoot: string
+  docsRootExists: boolean
+  documents: DocumentEntry[]
+  /** 非法文档的展示用路径 */
+  illegal: string[]
+  /** 缺失文档的展示用路径 */
+  missing: string[]
+  diagnostics: Diagnostic[]
+  /** 两份诊断文档解析出的诊断码 */
+  diagnoses: DiagnosisCode[]
+  summary: Summary
+  /** 锁的状态；未上锁时为 null */
+  lock: LockReport | null
+  /** 可直接阅读的汇总文本 */
+  text: string
+}
+```
+
+## 渲染
+
+渲染接收六份预期文档的正文，输出页面路径、字节数和当前的检查状态。
+
+```ts
+export interface RenderDocument {
+  /** 展示用路径，例如 .coder/design/file.md */
+  path: string
+  kind: DocumentKind
+  /** 文档是否存在；缺失时正文为空串 */
+  present: boolean
+  content: string
+}
+
+export interface RenderPayload {
+  docs: RenderDocument[]
+}
+
+export interface RenderResult {
+  ok: boolean
+  /** design.html 的绝对路径 */
+  output: string
+  /** HTML 的 UTF-8 字节数 */
+  bytes: number
+  /** 渲染时文档是否齐全且格式正确 */
+  healthy: boolean
+  summary: Summary
+  missing: string[]
+  illegal: string[]
+  diagnostics: Diagnostic[]
+  text: string
+}
+```
+
+## 锁
+
+`.coder/lock.md` 是锁状态文件；第一行是固定声明，第二行是 hash，第三行起是授权原文。`list` 解析它并报告 hash 是否匹配。
+
+```ts
+export interface LockFile {
+  /** 固定声明 */
+  declaration: string
+  /** 所有 .coder 文件（除 lock.md）内容 hash 拼接后的 sha256 */
+  hash: string
+  /** 用户授权原文，逐字保存 */
+  authorization: string
+}
+
+export interface LockReport {
+  present: boolean
+  /** 第一行是否为固定声明 */
+  declarationValid: boolean
+  /** 第二行记录的 hash */
+  hash: string | null
+  /** 重新计算的 hash 是否与记录一致；无法计算时为 null */
+  hashMatches: boolean | null
+  /** 当前 .coder 的 hash */
+  currentHash: string | null
+  /** 授权原文的长度，不返回原文本身 */
+  authorizationLength: number
+}
+```
+
+## 更新
+
+`update` 的输入是一组「tmp 源文件 → .coder 目标文件」；上锁时第一次调用只返回 key 和计划，第二次调用才替换。
+
+```ts
+export interface UpdateItem {
+  /** tmp/ 下的源文件，相对项目根目录 */
+  source: string
+  /** .coder 下的目标文件 */
+  target: string
+}
+
+export interface UpdateRequest {
+  locked: boolean
+  /** 第一次调用返回的随机 key，仅当前进程内存有效 */
+  key?: string
+  phase?: &#39;review&#39;
+  files: UpdateItem[]
+}
+
+export interface UpdateDecision {
+  /** 第一次调用返回的随机 key */
+  key: string
+  decision: &#39;supplement&#39; | &#39;adjustment&#39;
+  /** 本次更新的用户授权原文 */
+  review: string
+  /** adjustment 时传入的新建分支名 */
+  branch?: string
+}
+
+export interface UpdateResult {
+  locked: boolean
+  decision?: &#39;supplement&#39; | &#39;adjustment&#39;
+  /** supplement 为当前分支；adjustment 为传入的新分支名 */
+  branch?: string
+  /** adjustment 分支前的 checkpoint commit；没有变化时为 null */
+  checkpoint?: string | null
+  /** 本次 update 的 commit；没有变化时为 null */
+  commit?: string | null
+  /** 更新后的锁 hash */
+  hash?: string
+  applied?: UpdateItem[]
+}
+```
+</pre></div>
+</section>
+<section class="doc" id="diagnosis-error" data-doc="diagnosis-error">
+  <h2>.coder/diagnosis/error.md</h2>
+  <div class="markdown doc-fallback"><pre># E0001
+
+作用范围：全局
+
+诊断方式：静态代码审查
+
+步骤1：查看 [src/docs.js] 文档扫描与诊断汇总，如果 illegal 或 missing 非空，或者 diagnostics 中存在 error 级规则，则认定为 E0001，否则继续。
+
+步骤2：查看 [src/tools/list.js] list 工具的输出，如果 text 没有报告文档状态或诊断，则认定为 E0001，否则继续。
+
+# E0002
+
+作用范围：.coder/**
+
+诊断方式：运行时日志审查
+
+步骤1：在 [src/tools/update.js] lock hash 校验处，插入日志：
+
+```ts
+console.log(&#39;coder-lock-check&#39;, { recordedHash, currentHash })
+```
+
+步骤2：查看日志，如果 recordedHash 与 currentHash 不一致，则认定为 E0002，否则继续。
+</pre></div>
+</section>
+<section class="doc" id="diagnosis-warn" data-doc="diagnosis-warn">
+  <h2>.coder/diagnosis/warn.md</h2>
+  <div class="markdown doc-fallback"><pre># W0001
+
+作用范围：src/**/*.js
+
+诊断方式：静态代码审查
+
+步骤1：查看 [index.js] definitions 数组，如果缺少 src/tools 下的工具，则认定为 W0001，否则继续。
+
+步骤2：查看 [src/tools/**/*.js] 工具注册代码，如果某个工具文件没有注册，则认定为 W0001，否则继续。
+
+# W0002
+
+作用范围：全局
+
+诊断方式：静态代码审查
+
+步骤1：查看 [src/render.js] CDN 脚本地址，如果缺少 marked@15 或 mermaid@11，则认定为 W0002，否则继续。
+
+步骤2：查看 [src/render.js] 无脚本降级分支，如果页面没有保留源码正文，则认定为 W0002，否则继续。
+</pre></div>
+</section>
+  </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<script type="application/json" id="coder-data">{"docs":[{"path":".coder/design/file.md","kind":"file","present":true,"content":"# index.js\n插件入口：导出 name、inject 与 apply，注册 `list`、`render`、`lock`、`unlock`、`update` 工具。\n# package.json\n包清单：声明 coder bundle、导出文件与测试脚本。\n# cordis.patch.yml\nbundle 补丁：插入 id 为 coder 的 Host 插件行。\n# README.md\n插件说明：检查目标、使用方式与固化约定。\n# icon.svg\n插件图标：文档与勾选标记。\n# src\n源码目录。\n## src/docs.js\n文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份文档的确定性检查。\n## src/glob.js\n通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。\n## src/lock.js\n锁文件：lock.md 的格式解析、.coder hash 计算与读写。\n## src/git.js\nupdate 的 git 操作：提交指定文件、checkpoint 与新建分支。\n## src/render.js\nHTML 渲染：把四份文档写成单页 design.html。\n# src/tools\n工具定义目录。\n## src/tools/list.js\n`list` 工具：读取项目根目录、调用检查器、输出结构化报告与可读汇总。\n## src/tools/lock.js\n`lock` / `unlock` 工具：写入或删除 lock.md，处理授权原文。\n## src/tools/render.js\n`render` 工具：默认把 HTML 写到 dist/.coder/design.html。\n## src/tools/root.js\n所有工具共用的项目根目录解析。\n## src/tools/update.js\n`update` 工具：校验 tmp 源、上锁时分两步、替换并更新 hash，按 decision 提交。\n# tests\n测试目录。\n## tests/docs.test.js\n覆盖扫描、缺失、非法、文件覆盖与四份文档的格式诊断。\n## tests/glob.test.js\n覆盖 *、**、? 与 tmp/** 的匹配行为。\n## tests/plugin.test.js\n覆盖插件装配、工具注册与工具端到端调用。\n## tests/lock.test.js\n覆盖 lock/unlock、lock.md 格式、hash 比对与 list 诊断。\n## tests/render.test.js\n覆盖 HTML 生成、默认输出路径、缺失文档与确定性。\n## tests/update.test.js\n覆盖未上锁替换、上锁两步、key/review、补充提交、调整分支与 hash 校验。\n# docs\n插件设计文档目录。\n## docs/design.md\ncoder 的设计说明：文档约定、list/render 行为与格式规则。\n# locale\n显示文案目录。\n## locale/en.json\n英文标题与描述。\n## locale/zh.json\n中文标题与描述。\n# dist/**\n渲染输出目录及生成文件。\n# tmp/**\nupdate 的源文件暂存目录。\n# .git/**\ngit 元数据目录。\n"},{"path":".coder/design/architecture.md","kind":"architecture","present":true,"content":"# 架构\n## 全局视角\n从 Host 的 tools 服务到两个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，render 复用扫描结果生成 HTML。\n\n```mermaid\nflowchart TB\n  subgraph 宿主层\n    cordis[\"Cordis 上下文\"]\n    tools[\"tools 服务\"]\n  end\n  subgraph 工具层\n    list[\"list 工具\"]\n    render[\"render 工具\"]\n    lock[\"lock 工具\"]\n    unlock[\"unlock 工具\"]\n    update[\"update 工具\"]\n  end\n  subgraph 扫描层\n    walk[\"目录遍历\"]\n    parse[\"Markdown 解析\"]\n  end\n  subgraph 诊断层\n    file[\"file.md 校验\"]\n    glob[\"通配匹配\"]\n    arch[\"architecture.md 校验\"]\n    flow[\"flow.md 校验\"]\n    data[\"data_structure.md 校验\"]\n    lockHash[\"lock.md hash 校验\"]\n    report[\"报告汇总\"]\n  end\n  subgraph 锁层\n    lockFile[\"lock.md\"]\n    hash[\"hash 计算\"]\n  end\n  subgraph 提交层\n    git[\"git commit / 分支\"]\n  end\n  宿主层 --> 工具层\n  工具层 --> 扫描层\n  工具层 --> 锁层\n  工具层 --> 提交层\n  扫描层 --> 诊断层\n  锁层 --> 诊断层\n```\n\n## 局部视角：文档扫描\n只回答「怎么发现文件、怎么比对预期文档」，不重复全局图的层。\n\n```mermaid\nflowchart LR\n  A[解析 root] --> B[读取 .coder]\n  B --> C[递归遍历]\n  C --> D[相对路径集合]\n  D --> E[比对预期文档]\n  E --> F[缺失 / 非法]\n```\n\n## 局部视角：文件覆盖\n只回答「file.md 是否覆盖项目里的每个文件」，`.coder` 自身除外。\n\n```mermaid\nflowchart LR\n  A[读取 file.md 路径] --> B[列出项目文件]\n  B --> C[排除 .coder]\n  C --> D[通配匹配]\n  D --> E[未覆盖文件]\n```\n\n## 局部视角：数据结构\n只回答「data_structure.md 如何被校验」：按 `##` 分段，每段读取 ts 围栏，提取 interface 名称并查重。\n\n```mermaid\nflowchart LR\n  A[读取 data_structure.md] --> B[按 ## 分段]\n  B --> C[收集 ts 围栏]\n  C --> D[提取 interface]\n  D --> E[空块 / 缺 interface / 重名]\n```\n\n## 局部视角：锁定与更新\n只回答「lock 如何约束修改、update 如何放行修改」；hash 计算复用全局图的锁层。\n\n```mermaid\nflowchart LR\n  A[lock] --> B[计算 hash]\n  B --> C[写 lock.md]\n  D[update] --> E{已上锁?}\n  E -- 否 --> F[直接替换，不提交]\n  E -- 是 --> G{带 key?}\n  G -- 否 --> H[返回 key 和审查计划]\n  G -- 是 --> I[校验 hash / key / 源文件]\n  I --> J{decision}\n  J -- 补充 --> K[替换 + 更新 hash + 提交]\n  J -- 调整 --> L[checkpoint + 新分支 + 替换 + 提交]\n```\n\n## 局部视角：渲染\n只回答「render 如何把文档变成 HTML」，扫描和诊断复用全局图。\n\n```mermaid\nflowchart LR\n  A[render 调用] --> B[读取四份文档]\n  B --> C[汇总诊断]\n  C --> D[生成 HTML]\n  D --> E[写入 dist/.coder/design.html]\n```\n"},{"path":".coder/design/flow.md","kind":"flow","present":true,"content":"# 流程\n## 检查项目文档\n```mermaid\nflowchart TD\n  A[list 调用] --> B[解析 root]\n  B --> C[扫描 .coder/ 文档树]\n  C --> D[比对预期文档]\n  D --> E[逐份格式诊断]\n  E --> F[汇总报告]\n```\n## 检查文件覆盖\n用 file.md 的路径/通配检查项目里的每个文件。\n\n```mermaid\nflowchart LR\n  A[读取 file.md] --> B[列出项目文件]\n  B --> C[排除 .coder]\n  C --> D[逐项通配匹配]\n  D --> E[未覆盖文件]\n```\n## 加载插件\n```mermaid\nflowchart TD\n  A[加载 coder bundle] --> B[执行 apply]\n  B --> C[注册 list / render]\n  B --> D[注册 lock / unlock]\n  B --> E[注册 update]\n```\n## 检查数据结构\n按 `##` 分段检查 data_structure.md 的 ts 围栏和 interface 声明。\n\n```mermaid\nflowchart TD\n  A[读取 data_structure.md] --> B[按 ## 分段]\n  B --> C[收集 ts 围栏]\n  C --> D[提取 interface]\n  D --> E[记录诊断]\n```\n## 上锁\nlock 计算当前 .coder 的 hash，把声明、hash 和授权原文写进 lock.md。\n\n```mermaid\nflowchart TD\n  A[lock 调用] --> B[计算 .coder hash]\n  B --> C[写 .coder/lock.md]\n  C --> D[返回锁状态]\n```\n## 解锁\nunlock 校验授权原文，删除 lock.md；hash 不一致时仍然解锁并报告。\n\n```mermaid\nflowchart TD\n  A[unlock 调用] --> B[校验授权原文]\n  B --> C[删除 .coder/lock.md]\n  C --> D[返回 hashMatches]\n```\n## 更新设计\nupdate 从 tmp/ 读取源文件；上锁时先审查、再带 key 和 decision 执行。\n\n```mermaid\nflowchart TD\n  A[update 调用] --> B{已上锁?}\n  B -- 否 --> C[直接替换]\n  B -- 是 --> D{带 key?}\n  D -- 否 --> E[返回 key 和审查计划]\n  D -- 是 --> F[校验 hash / key / 源文件]\n  F --> G{decision}\n  G -- 补充 --> H[替换 + 更新 hash + 提交]\n  G -- 调整 --> I[checkpoint + 按 branch 新建分支 + 提交]\n```\n## 渲染设计文档\n把四份文档渲染成一个 HTML 页面。\n\n```mermaid\nflowchart LR\n  A[render 调用] --> B[读取 .coder/design]\n  B --> C[汇总诊断]\n  C --> D[生成 HTML]\n  D --> E[写入 dist/.coder]\n```\n"},{"path":".coder/design/data_structure.md","kind":"data","present":true,"content":"# 数据结构\n\n只记录跨模块传递的关键结构：诊断、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/docs.js` 自己维护。\n\n## 诊断\n\n`list` 和 `render` 都返回诊断；每条诊断能定位到文档和行，并带一个稳定的规则代码。\n\n```ts\nexport type DiagnosticSeverity = 'error'\n\nexport interface Diagnostic {\n  /** 展示用文档路径，例如 .coder/design/file.md */\n  doc: string\n  /** 1-based 行号 */\n  line: number\n  /** 稳定规则代码，例如 file.coverage.missing */\n  rule: string\n  severity: DiagnosticSeverity\n  /** 给人看的原因与改法 */\n  message: string\n}\n```\n\n## 文档条目\n\n`.coder/` 下扫描到的每个文件都变成一条文档条目，预期、非法和缺失共用同一种形状。\n\n```ts\nexport type DocumentKind = 'file' | 'architecture' | 'flow' | 'data' | 'lock' | 'generic'\n\nexport type DocumentStatus = 'expected' | 'illegal' | 'missing' | 'lock'\n\nexport interface DocumentEntry {\n  /** 展示用路径，例如 .coder/design/flow.md */\n  path: string\n  /** 相对于 .coder/ 的路径，例如 design/flow.md */\n  relative: string\n  /** 绝对路径 */\n  absolute: string\n  status: DocumentStatus\n  /** 预期文档在磁盘上是否存在；非法文档为 true */\n  exists: boolean\n  kind: DocumentKind\n}\n```\n\n## 检查报告\n\n`list` 的返回值，也是 `render` 判断文档是否健康的依据。\n\n```ts\nexport interface Summary {\n  /** 预期文档总数 */\n  expected: number\n  /** 找到的预期文档数 */\n  found: number\n  /** 非法文档数 */\n  illegal: number\n  /** 缺失文档数 */\n  missing: number\n  /** 诊断条数 */\n  diagnostics: number\n  /** .coder/lock.md 是否存在 */\n  locked: boolean\n}\n\nexport interface Report {\n  /** 没有非法文档、缺失文档和诊断时为 true */\n  ok: boolean\n  /** 项目根目录的绝对路径 */\n  root: string\n  /** .coder/ 的绝对路径 */\n  docsRoot: string\n  docsRootExists: boolean\n  documents: DocumentEntry[]\n  /** 非法文档的展示用路径 */\n  illegal: string[]\n  /** 缺失文档的展示用路径 */\n  missing: string[]\n  diagnostics: Diagnostic[]\n  summary: Summary\n  /** 锁的状态；未上锁时为 null */\n  lock: LockReport | null\n  /** 可直接阅读的汇总文本 */\n  text: string\n}\n```\n\n## 渲染\n\n渲染只接收四份文档的正文，输出页面路径、字节数和当前的检查状态。\n\n```ts\nexport interface RenderDocument {\n  /** 展示用路径，例如 .coder/design/file.md */\n  path: string\n  kind: DocumentKind\n  /** 文档是否存在；缺失时正文为空串 */\n  present: boolean\n  content: string\n}\n\nexport interface RenderPayload {\n  docs: RenderDocument[]\n}\n\nexport interface RenderResult {\n  ok: boolean\n  /** design.html 的绝对路径 */\n  output: string\n  /** HTML 的 UTF-8 字节数 */\n  bytes: number\n  /** 渲染时文档是否齐全且格式正确 */\n  healthy: boolean\n  summary: Summary\n  missing: string[]\n  illegal: string[]\n  diagnostics: Diagnostic[]\n  text: string\n}\n```\n\n## 锁\n\n`.coder/lock.md` 是锁状态文件；第一行是固定声明，第二行是 hash，第三行起是授权原文。`list` 解析它并报告 hash 是否匹配。\n\n```ts\nexport interface LockFile {\n  /** 固定声明 */\n  declaration: string\n  /** 所有 .coder 文件（除 lock.md）内容 hash 拼接后的 sha256 */\n  hash: string\n  /** 用户授权原文，逐字保存 */\n  authorization: string\n}\n\nexport interface LockReport {\n  present: boolean\n  /** 第一行是否为固定声明 */\n  declarationValid: boolean\n  /** 第二行记录的 hash */\n  hash: string | null\n  /** 重新计算的 hash 是否与记录一致；无法计算时为 null */\n  hashMatches: boolean | null\n  /** 当前 .coder 的 hash */\n  currentHash: string | null\n  /** 授权原文的长度，不返回原文本身 */\n  authorizationLength: number\n}\n```\n\n## 更新\n\n`update` 的输入是一组「tmp 源文件 → .coder 目标文件」；上锁时第一次调用只返回 key 和计划，第二次调用才替换。\n\n```ts\nexport interface UpdateItem {\n  /** tmp/ 下的源文件，相对项目根目录 */\n  source: string\n  /** .coder 下的目标文件 */\n  target: string\n}\n\nexport interface UpdateRequest {\n  locked: boolean\n  /** 第一次调用返回的随机 key，仅当前进程内存有效 */\n  key?: string\n  phase?: 'review'\n  files: UpdateItem[]\n}\n\nexport interface UpdateDecision {\n  /** 第一次调用返回的随机 key */\n  key: string\n  decision: 'supplement' | 'adjustment'\n  /** 本次更新的用户授权原文 */\n  review: string\n  /** adjustment 时传入的新建分支名 */\n  branch?: string\n}\n\nexport interface UpdateResult {\n  locked: boolean\n  decision?: 'supplement' | 'adjustment'\n  /** supplement 为当前分支；adjustment 为传入的新分支名 */\n  branch?: string\n  /** adjustment 分支前的 checkpoint commit；没有变化时为 null */\n  checkpoint?: string | null\n  /** 本次 update 的 commit；没有变化时为 null */\n  commit?: string | null\n  /** 更新后的锁 hash */\n  hash?: string\n  applied?: UpdateItem[]\n}\n```\n"}]}</script>
+<script type="application/json" id="coder-data">{"docs":[{"path":".coder/design/file.md","kind":"file","present":true,"content":"# index.js\n插件入口：导出 name、inject 与 apply，注册 `list`、`render`、`lock`、`unlock`、`update` 工具。\n# package.json\n包清单：声明 coder bundle、导出文件与测试脚本。\n# cordis.patch.yml\nbundle 补丁：插入 id 为 coder 的 Host 插件行。\n# README.md\n插件说明：检查目标、使用方式与固化约定。\n# icon.svg\n插件图标：文档与勾选标记。\n# src\n源码目录。\n## src/docs.js\n文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份设计文档和两份诊断文档的确定性检查，并汇总诊断码作用范围。\n## src/glob.js\n通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。\n## src/markdown.js\nMarkdown 结构扫描：提取标题、围栏、行号和未闭合围栏。\n## src/diagnosis.js\n诊断文档：解析 error.md / warn.md，校验诊断码、作用范围、诊断方式、步骤格式与编号，并检查文件通配命中。\n## src/lock.js\n锁文件：lock.md 的格式解析、.coder hash 计算与读写。\n## src/git.js\nupdate 的 git 操作：提交指定文件、checkpoint 与新建分支。\n## src/render.js\nHTML 渲染：把六份预期文档写成单页 design.html。\n# src/tools\n工具定义目录。\n## src/tools/list.js\n`list` 工具：读取项目根目录、调用检查器、输出结构化报告与可读汇总。\n## src/tools/lock.js\n`lock` / `unlock` 工具：写入或删除 lock.md，处理授权原文。\n## src/tools/render.js\n`render` 工具：默认把 HTML 写到 dist/.coder/design.html。\n## src/tools/root.js\n所有工具共用的项目根目录解析。\n## src/tools/update.js\n`update` 工具：校验 tmp 源、上锁时分两步、替换并更新 hash，按 decision 提交。\n# tests\n测试目录。\n## tests/docs.test.js\n覆盖扫描、缺失、非法、文件覆盖与六份文档的格式诊断。\n## tests/diagnosis.test.js\n覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。\n## tests/glob.test.js\n覆盖 *、**、? 与 tmp/** 的匹配行为。\n## tests/plugin.test.js\n覆盖插件装配、工具注册与工具端到端调用。\n## tests/lock.test.js\n覆盖 lock/unlock、lock.md 格式、hash 比对与 list 诊断。\n## tests/render.test.js\n覆盖 HTML 生成、默认输出路径、缺失文档与确定性。\n## tests/update.test.js\n覆盖未上锁替换、上锁两步、key/review、补充提交、调整分支与 hash 校验。\n# docs\n插件设计文档目录。\n## docs/design.md\ncoder 的设计说明：文档约定、list/render 行为与格式规则。\n# locale\n显示文案目录。\n## locale/en.json\n英文标题与描述。\n## locale/zh.json\n中文标题与描述。\n# dist/**\n渲染输出目录及生成文件。\n# tmp/**\nupdate 的源文件暂存目录。\n# .git/**\ngit 元数据目录。\n"},{"path":".coder/design/architecture.md","kind":"architecture","present":true,"content":"# 架构\n## 全局视角\n从 Host 的 tools 服务到五个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，render 复用扫描结果生成 HTML。\n\n```mermaid\nflowchart TB\n  subgraph 宿主层\n    cordis[\"Cordis 上下文\"]\n    tools[\"tools 服务\"]\n  end\n  subgraph 工具层\n    list[\"list 工具\"]\n    render[\"render 工具\"]\n    lock[\"lock 工具\"]\n    unlock[\"unlock 工具\"]\n    update[\"update 工具\"]\n  end\n  subgraph 扫描层\n    walk[\"目录遍历\"]\n    parse[\"Markdown 解析\"]\n  end\n  subgraph 诊断层\n    file[\"file.md 校验\"]\n    glob[\"通配匹配\"]\n    arch[\"architecture.md 校验\"]\n    flow[\"flow.md 校验\"]\n    data[\"data_structure.md 校验\"]\n    diag[\"诊断码校验\"]\n    scope[\"作用范围命中\"]\n    lockHash[\"lock.md hash 校验\"]\n    report[\"报告汇总\"]\n  end\n  subgraph 锁层\n    lockFile[\"lock.md\"]\n    hash[\"hash 计算\"]\n  end\n  subgraph 提交层\n    git[\"git commit / 分支\"]\n  end\n  宿主层 --> 工具层\n  工具层 --> 扫描层\n  工具层 --> 锁层\n  工具层 --> 提交层\n  扫描层 --> 诊断层\n  锁层 --> 诊断层\n  诊断层 --> report\n```\n\n## 局部视角：文档扫描\n只回答「怎么发现文件、怎么比对预期文档」，不重复全局图的层。\n\n```mermaid\nflowchart LR\n  A[解析 root] --> B[读取 .coder]\n  B --> C[递归遍历]\n  C --> D[相对路径集合]\n  D --> E[比对预期文档]\n  E --> F[缺失 / 非法]\n```\n\n## 局部视角：文件覆盖\n只回答「file.md 是否覆盖项目里的每个文件」，`.coder` 自身除外。\n\n```mermaid\nflowchart LR\n  A[读取 file.md 路径] --> B[列出项目文件]\n  B --> C[排除 .coder]\n  C --> D[通配匹配]\n  D --> E[未覆盖文件]\n```\n\n## 局部视角：诊断码\n只回答「error.md / warn.md 如何被解析和检查」：编码、作用范围、诊断方式、步骤格式和文件通配命中。\n\n```mermaid\nflowchart LR\n  A[读取 error.md / warn.md] --> B[解析 # E0001 / # W0001]\n  B --> C[校验前缀与 4 位数字]\n  C --> D[校验作用范围、诊断方式与步骤格式]\n  D --> E{作用范围是通配?}\n  E -- 是 --> F[匹配项目文件并要求至少命中一个]\n  E -- 否 --> G[全局范围]\n  F --> H[写入 diagnoses]\n  G --> H\n```\n\n## 局部视角：数据结构\n只回答「data_structure.md 如何被校验」：按 `##` 分段，每段读取 ts 围栏，提取 interface 名称并查重。\n\n```mermaid\nflowchart LR\n  A[读取 data_structure.md] --> B[按 ## 分段]\n  B --> C[收集 ts 围栏]\n  C --> D[提取 interface]\n  D --> E[空块 / 缺 interface / 重名]\n```\n\n## 局部视角：锁定与更新\n只回答「lock 如何约束修改、update 如何放行修改」；hash 计算复用全局图的锁层。\n\n```mermaid\nflowchart LR\n  A[lock] --> B[计算 hash]\n  B --> C[写 lock.md]\n  D[update] --> E{已上锁?}\n  E -- 否 --> F[直接替换，不提交]\n  E -- 是 --> G{带 key?}\n  G -- 否 --> H[返回 key 和审查计划]\n  G -- 是 --> I[校验 hash / key / 源文件]\n  I --> J{decision}\n  J -- 补充 --> K[替换 + 更新 hash + 提交]\n  J -- 调整 --> L[checkpoint + 新分支 + 替换 + 提交]\n```\n\n## 局部视角：渲染\n只回答「render 如何把文档变成 HTML」，扫描和诊断复用全局图。\n\n```mermaid\nflowchart LR\n  A[render 调用] --> B[读取六份预期文档]\n  B --> C[汇总诊断]\n  C --> D[生成 HTML]\n  D --> E[写入 dist/.coder/design.html]\n```\n"},{"path":".coder/design/flow.md","kind":"flow","present":true,"content":"# 流程\n## 检查项目文档\n```mermaid\nflowchart TD\n  A[list 调用] --> B[解析 root]\n  B --> C[扫描 .coder/ 文档树]\n  C --> D[比对预期文档]\n  D --> E[逐份格式诊断]\n  E --> F[汇总报告]\n```\n## 检查文件覆盖\n用 file.md 的路径/通配检查项目里的每个文件。\n\n```mermaid\nflowchart LR\n  A[读取 file.md] --> B[列出项目文件]\n  B --> C[排除 .coder]\n  C --> D[逐项通配匹配]\n  D --> E[未覆盖文件]\n```\n## 检查诊断码\n在 list 时解析 error.md 和 warn.md，校验编码、作用范围、诊断方式、步骤格式与编号；作用范围是文件通配时，以及步骤里的文件通配，都必须至少命中一个项目文件。\n\n```mermaid\nflowchart TD\n  A[读取诊断文档] --> B[按 # 分段解析诊断码]\n  B --> C[校验 E/W 前缀与 4 位数字]\n  C --> D[读取作用范围]\n  D --> E{全局还是通配?}\n  E -- 全局 --> F[记录全局诊断码]\n  E -- 通配 --> G[用项目文件匹配]\n  G --> H{至少命中一个?}\n  H -- 否 --> I[报 diagnosis.scope.no-match]\n  H -- 是 --> J[记录命中数]\n  F --> K[校验诊断方式、步骤格式与编号]\n  I --> K\n  J --> K\n  K --> L[写入 diagnoses]\n```\n## 加载插件\n```mermaid\nflowchart TD\n  A[加载 coder bundle] --> B[执行 apply]\n  B --> C[注册 list / render]\n  B --> D[注册 lock / unlock]\n  B --> E[注册 update]\n```\n## 检查数据结构\n按 `##` 分段检查 data_structure.md 的 ts 围栏和 interface 声明。\n\n```mermaid\nflowchart TD\n  A[读取 data_structure.md] --> B[按 ## 分段]\n  B --> C[收集 ts 围栏]\n  C --> D[提取 interface]\n  D --> E[记录诊断]\n```\n## 上锁\nlock 计算当前 .coder 的 hash，把声明、hash 和授权原文写进 lock.md。\n\n```mermaid\nflowchart TD\n  A[lock 调用] --> B[计算 .coder hash]\n  B --> C[写 .coder/lock.md]\n  C --> D[返回锁状态]\n```\n## 解锁\nunlock 校验授权原文，删除 lock.md；hash 不一致时仍然解锁并报告。\n\n```mermaid\nflowchart TD\n  A[unlock 调用] --> B[校验授权原文]\n  B --> C[删除 .coder/lock.md]\n  C --> D[返回 hashMatches]\n```\n## 更新文档\nupdate 从 tmp/ 读取源文件；上锁时先审查、再带 key 和 decision 执行。\n\n```mermaid\nflowchart TD\n  A[update 调用] --> B{已上锁?}\n  B -- 否 --> C[直接替换]\n  B -- 是 --> D{带 key?}\n  D -- 否 --> E[返回 key 和审查计划]\n  D -- 是 --> F[校验 hash / key / 源文件]\n  F --> G{decision}\n  G -- 补充 --> H[替换 + 更新 hash + 提交]\n  G -- 调整 --> I[checkpoint + 按 branch 新建分支 + 提交]\n```\n## 渲染文档\n把六份预期文档渲染成一个 HTML 页面。\n\n```mermaid\nflowchart LR\n  A[render 调用] --> B[读取 .coder/design 与 .coder/diagnosis]\n  B --> C[汇总诊断]\n  C --> D[生成 HTML]\n  D --> E[写入 dist/.coder]\n```\n"},{"path":".coder/design/data_structure.md","kind":"data","present":true,"content":"# 数据结构\n\n只记录跨模块传递的关键结构：诊断、诊断码、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。\n\n## 诊断\n\n`list` 和 `render` 都返回诊断；每条诊断能定位到文档和行，并带一个稳定的规则代码。\n\n```ts\nexport type DiagnosticSeverity = 'error'\n\nexport interface Diagnostic {\n  /** 展示用文档路径，例如 .coder/design/file.md */\n  doc: string\n  /** 1-based 行号 */\n  line: number\n  /** 稳定规则代码，例如 file.coverage.missing */\n  rule: string\n  severity: DiagnosticSeverity\n  /** 给人看的原因与改法 */\n  message: string\n}\n```\n\n## 诊断码\n\n诊断文档解析出的诊断码；`list` 用它展示编码、作用范围、诊断方式、步骤和文件通配命中数。\n\n```ts\nexport type DiagnosisSeverity = 'error' | 'warn'\n\nexport type DiagnosisMethod = '静态代码审查' | '运行时日志审查'\n\nexport type DiagnosisStepKind = '静态' | '插入日志' | '查看日志'\n\nexport interface DiagnosisStep {\n  /** 步骤N 的 N */\n  number: number\n  /** 步骤所在行 */\n  line: number\n  kind: DiagnosisStepKind\n  /** 步骤里的文件通配；查看日志步骤为 null */\n  glob: string | null\n  /** 文件通配命中的项目文件数；全局或未检查时为 null */\n  matches: number | null\n  /** 插入日志步骤是否带了 ts 围栏 */\n  log: boolean\n}\n\nexport interface DiagnosisCode {\n  /** 展示用文档路径，例如 .coder/diagnosis/error.md */\n  doc: string\n  /** 诊断码标题所在行 */\n  line: number\n  /** E0001 或 W0001 */\n  code: string\n  severity: DiagnosisSeverity\n  /** 全局或文件路径通配；作用范围无效时为 null */\n  scope: string | null\n  scopeKind: 'global' | 'glob' | null\n  /** 静态代码审查或运行时日志审查；无效时为 null */\n  method: DiagnosisMethod | null\n  steps: DiagnosisStep[]\n  /** 文件通配命中的项目文件数；全局或未检查时为 null */\n  matches: number | null\n}\n```\n\n## 文档条目\n\n`.coder/` 下扫描到的每个文件都变成一条文档条目，预期、非法和缺失共用同一种形状。\n\n```ts\nexport type DocumentKind =\n  | 'file'\n  | 'architecture'\n  | 'flow'\n  | 'data'\n  | 'diagnosis-error'\n  | 'diagnosis-warn'\n  | 'lock'\n  | 'generic'\n\nexport type DocumentStatus = 'expected' | 'illegal' | 'missing' | 'lock'\n\nexport interface DocumentEntry {\n  /** 展示用路径，例如 .coder/design/flow.md */\n  path: string\n  /** 相对于 .coder/ 的路径，例如 design/flow.md */\n  relative: string\n  /** 绝对路径 */\n  absolute: string\n  status: DocumentStatus\n  /** 预期文档在磁盘上是否存在；非法文档为 true */\n  exists: boolean\n  kind: DocumentKind\n}\n```\n\n## 检查报告\n\n`list` 的返回值，也是 `render` 判断文档是否健康的依据。\n\n```ts\nexport interface Summary {\n  /** 预期文档总数 */\n  expected: number\n  /** 找到的预期文档数 */\n  found: number\n  /** 非法文档数 */\n  illegal: number\n  /** 缺失文档数 */\n  missing: number\n  /** 诊断条数 */\n  diagnostics: number\n  /** 解析出的诊断码数量 */\n  codes: number\n  /** .coder/lock.md 是否存在 */\n  locked: boolean\n}\n\nexport interface Report {\n  /** 没有非法文档、缺失文档和诊断时为 true */\n  ok: boolean\n  /** 项目根目录的绝对路径 */\n  root: string\n  /** .coder/ 的绝对路径 */\n  docsRoot: string\n  docsRootExists: boolean\n  documents: DocumentEntry[]\n  /** 非法文档的展示用路径 */\n  illegal: string[]\n  /** 缺失文档的展示用路径 */\n  missing: string[]\n  diagnostics: Diagnostic[]\n  /** 两份诊断文档解析出的诊断码 */\n  diagnoses: DiagnosisCode[]\n  summary: Summary\n  /** 锁的状态；未上锁时为 null */\n  lock: LockReport | null\n  /** 可直接阅读的汇总文本 */\n  text: string\n}\n```\n\n## 渲染\n\n渲染接收六份预期文档的正文，输出页面路径、字节数和当前的检查状态。\n\n```ts\nexport interface RenderDocument {\n  /** 展示用路径，例如 .coder/design/file.md */\n  path: string\n  kind: DocumentKind\n  /** 文档是否存在；缺失时正文为空串 */\n  present: boolean\n  content: string\n}\n\nexport interface RenderPayload {\n  docs: RenderDocument[]\n}\n\nexport interface RenderResult {\n  ok: boolean\n  /** design.html 的绝对路径 */\n  output: string\n  /** HTML 的 UTF-8 字节数 */\n  bytes: number\n  /** 渲染时文档是否齐全且格式正确 */\n  healthy: boolean\n  summary: Summary\n  missing: string[]\n  illegal: string[]\n  diagnostics: Diagnostic[]\n  text: string\n}\n```\n\n## 锁\n\n`.coder/lock.md` 是锁状态文件；第一行是固定声明，第二行是 hash，第三行起是授权原文。`list` 解析它并报告 hash 是否匹配。\n\n```ts\nexport interface LockFile {\n  /** 固定声明 */\n  declaration: string\n  /** 所有 .coder 文件（除 lock.md）内容 hash 拼接后的 sha256 */\n  hash: string\n  /** 用户授权原文，逐字保存 */\n  authorization: string\n}\n\nexport interface LockReport {\n  present: boolean\n  /** 第一行是否为固定声明 */\n  declarationValid: boolean\n  /** 第二行记录的 hash */\n  hash: string | null\n  /** 重新计算的 hash 是否与记录一致；无法计算时为 null */\n  hashMatches: boolean | null\n  /** 当前 .coder 的 hash */\n  currentHash: string | null\n  /** 授权原文的长度，不返回原文本身 */\n  authorizationLength: number\n}\n```\n\n## 更新\n\n`update` 的输入是一组「tmp 源文件 → .coder 目标文件」；上锁时第一次调用只返回 key 和计划，第二次调用才替换。\n\n```ts\nexport interface UpdateItem {\n  /** tmp/ 下的源文件，相对项目根目录 */\n  source: string\n  /** .coder 下的目标文件 */\n  target: string\n}\n\nexport interface UpdateRequest {\n  locked: boolean\n  /** 第一次调用返回的随机 key，仅当前进程内存有效 */\n  key?: string\n  phase?: 'review'\n  files: UpdateItem[]\n}\n\nexport interface UpdateDecision {\n  /** 第一次调用返回的随机 key */\n  key: string\n  decision: 'supplement' | 'adjustment'\n  /** 本次更新的用户授权原文 */\n  review: string\n  /** adjustment 时传入的新建分支名 */\n  branch?: string\n}\n\nexport interface UpdateResult {\n  locked: boolean\n  decision?: 'supplement' | 'adjustment'\n  /** supplement 为当前分支；adjustment 为传入的新分支名 */\n  branch?: string\n  /** adjustment 分支前的 checkpoint commit；没有变化时为 null */\n  checkpoint?: string | null\n  /** 本次 update 的 commit；没有变化时为 null */\n  commit?: string | null\n  /** 更新后的锁 hash */\n  hash?: string\n  applied?: UpdateItem[]\n}\n```\n"},{"path":".coder/diagnosis/error.md","kind":"diagnosis-error","present":true,"content":"# E0001\n\n作用范围：全局\n\n诊断方式：静态代码审查\n\n步骤1：查看 [src/docs.js] 文档扫描与诊断汇总，如果 illegal 或 missing 非空，或者 diagnostics 中存在 error 级规则，则认定为 E0001，否则继续。\n\n步骤2：查看 [src/tools/list.js] list 工具的输出，如果 text 没有报告文档状态或诊断，则认定为 E0001，否则继续。\n\n# E0002\n\n作用范围：.coder/**\n\n诊断方式：运行时日志审查\n\n步骤1：在 [src/tools/update.js] lock hash 校验处，插入日志：\n\n```ts\nconsole.log('coder-lock-check', { recordedHash, currentHash })\n```\n\n步骤2：查看日志，如果 recordedHash 与 currentHash 不一致，则认定为 E0002，否则继续。\n"},{"path":".coder/diagnosis/warn.md","kind":"diagnosis-warn","present":true,"content":"# W0001\n\n作用范围：src/**/*.js\n\n诊断方式：静态代码审查\n\n步骤1：查看 [index.js] definitions 数组，如果缺少 src/tools 下的工具，则认定为 W0001，否则继续。\n\n步骤2：查看 [src/tools/**/*.js] 工具注册代码，如果某个工具文件没有注册，则认定为 W0001，否则继续。\n\n# W0002\n\n作用范围：全局\n\n诊断方式：静态代码审查\n\n步骤1：查看 [src/render.js] CDN 脚本地址，如果缺少 marked@15 或 mermaid@11，则认定为 W0002，否则继续。\n\n步骤2：查看 [src/render.js] 无脚本降级分支，如果页面没有保留源码正文，则认定为 W0002，否则继续。\n"}]}</script>
 <script>
 (function () {
   'use strict'
   var data = JSON.parse(document.getElementById('coder-data').textContent)
-  var content = document.getElementById('content')
   var nav = document.getElementById('nav')
   var hasMarked = typeof window.marked !== 'undefined'
   var hasMermaid = typeof window.mermaid !== 'undefined'
@@ -441,34 +1061,26 @@ a:hover { text-decoration: underline; }
   }
 
   data.docs.forEach(function (doc) {
-    var section = document.createElement('section')
-    section.className = 'doc'
-    section.id = doc.kind
-    var title = document.createElement('h2')
-    title.textContent = doc.path
-    section.appendChild(title)
-
-    if (!doc.present) {
-      var missing = document.createElement('div')
-      missing.className = 'doc-missing'
-      section.appendChild(missing)
-    } else if (doc.kind === 'file') {
-      section.appendChild(renderFileTree(doc.content))
-    } else {
-      var body = document.createElement('div')
-      body.className = 'markdown'
-      if (hasMarked) {
-        try {
-          body.innerHTML = window.marked.parse(doc.content, { gfm: true })
-        } catch (error) {
-          body.innerHTML = '<pre>' + escapeHtml(doc.content) + '</pre>'
-        }
-      } else {
-        body.innerHTML = '<pre>' + escapeHtml(doc.content) + '</pre>'
-      }
-      section.appendChild(body)
+    var section = document.getElementById(doc.kind)
+    if (section === null || !doc.present) return
+    var fallback = section.querySelector('.doc-fallback')
+    if (doc.kind === 'file') {
+      var tree = renderFileTree(doc.content)
+      if (fallback !== null) section.replaceChild(tree, fallback)
+      else section.appendChild(tree)
+      return
     }
-    content.appendChild(section)
+    if (!hasMarked) return
+    var body = document.createElement('div')
+    body.className = 'markdown'
+    try {
+      var diagnosis = doc.kind === 'diagnosis-error' || doc.kind === 'diagnosis-warn'
+      body.innerHTML = window.marked.parse(doc.content, { gfm: true, breaks: diagnosis })
+    } catch (error) {
+      return
+    }
+    if (fallback !== null) section.replaceChild(body, fallback)
+    else section.appendChild(body)
   })
 
   function jumpTo(id) {
@@ -498,6 +1110,8 @@ a:hover { text-decoration: underline; }
       if (jumpTo(id)) event.preventDefault()
     })
   }
+
+  while (nav.firstChild) nav.removeChild(nav.firstChild)
 
   var toc = document.createElement('ul')
   toc.className = 'toc'

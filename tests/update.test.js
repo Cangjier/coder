@@ -45,6 +45,23 @@ flowchart TD
 \`\`\`
 `
 
+const ERROR_OK = `# E0001
+作用范围：全局
+诊断方式：静态代码审查
+步骤1：查看 [**] 入口代码，如果缺少导出，则认定为 E0001，否则继续。
+步骤2：查看 [**] 注册代码，如果工具未注册，则认定为 E0001，否则继续。
+`
+
+const WARN_OK = `# W0001
+作用范围：全局
+诊断方式：运行时日志审查
+步骤1：在 [**] 检查点，插入日志：
+\`\`\`ts
+console.log('warn')
+\`\`\`
+步骤2：查看日志，如果出现警告，则认定为 W0001，否则继续。
+`
+
 const DATA_OK = `# 数据结构
 ## 诊断
 说明。
@@ -85,10 +102,13 @@ function git(root, ...args) {
 function writeProject(label = 'project') {
   const root = mkdtempSync(join(tempRoot, `${label}-`))
   mkdirSync(join(root, '.coder', 'design'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'diagnosis'), { recursive: true })
   writeFileSync(join(root, '.coder', 'design', 'file.md'), FILE_OK)
   writeFileSync(join(root, '.coder', 'design', 'architecture.md'), ARCHITECTURE_OK)
   writeFileSync(join(root, '.coder', 'design', 'flow.md'), FLOW_OK)
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
   git(root, 'init', '-q')
   git(root, 'config', 'user.email', 'coder@example.test')
   git(root, 'config', 'user.name', 'coder test')
@@ -130,6 +150,29 @@ describe('update 未上锁', () => {
     assert.match(result.text, /不推荐/)
     assert.match(flowOf(root), /未上锁更新/)
     assert.equal(commitCount(root), before)
+  })
+
+  it('允许用 tmp 源文件替换诊断文档', async () => {
+    const root = writeProject()
+    const next = `${ERROR_OK}
+# E0002
+作用范围：全局
+诊断方式：静态代码审查
+步骤1：查看 [**] 更新后的诊断文档，如果缺少步骤，则认定为 E0002，否则继续。
+`
+    writeFileSync(join(root, 'tmp', 'new-error.md'), next)
+
+    const result = await createUpdateTool(logger).execute(
+      { root, updates: [{ source: 'tmp/new-error.md', target: '.coder/diagnosis/error.md' }] },
+      { cwd: root },
+    )
+
+    assert.equal(result.locked, false)
+    assert.equal(result.applied[0].target, '.coder/diagnosis/error.md')
+    assert.match(readFileSync(join(root, '.coder', 'diagnosis', 'error.md'), 'utf8'), /E0002/)
+    const report = await inspectDocs({ root })
+    assert.equal(report.summary.codes, 3)
+    assert.equal(report.diagnostics.length, 0)
   })
 
   it('拒绝 tmp 之外的源文件和非法目标', async () => {

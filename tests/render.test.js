@@ -40,6 +40,23 @@ flowchart LR
 \`\`\`
 `
 
+const ERROR_OK = `# E0001
+作用范围：全局
+诊断方式：静态代码审查
+步骤1：查看 [**] 入口代码，如果缺少导出，则认定为 E0001，否则继续。
+步骤2：查看 [**] 注册代码，如果工具未注册，则认定为 E0001，否则继续。
+`
+
+const WARN_OK = `# W0001
+作用范围：全局
+诊断方式：运行时日志审查
+步骤1：在 [**] 检查点，插入日志：
+\`\`\`ts
+console.log('warn')
+\`\`\`
+步骤2：查看日志，如果出现警告，则认定为 W0001，否则继续。
+`
+
 const DATA_OK = `# 数据结构
 ## 诊断
 诊断条目。
@@ -69,10 +86,13 @@ after(() => {
 function writeProject(label = 'project') {
   const root = mkdtempSync(join(tempRoot, `${label}-`))
   mkdirSync(join(root, '.coder', 'design'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'diagnosis'), { recursive: true })
   writeFileSync(join(root, '.coder', 'design', 'file.md'), FILE_OK)
   writeFileSync(join(root, '.coder', 'design', 'architecture.md'), ARCHITECTURE_OK)
   writeFileSync(join(root, '.coder', 'design', 'flow.md'), FLOW_OK)
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
   return root
 }
 
@@ -83,7 +103,7 @@ describe('renderDesign', () => {
     assert.equal(result.ok, true)
     assert.equal(result.output, join(root, 'dist', '.coder', 'design.html'))
     assert.equal(result.healthy, true)
-    assert.equal(result.summary.found, 4)
+    assert.equal(result.summary.found, 6)
     assert.ok(existsSync(result.output))
 
     const html = readFileSync(result.output, 'utf8')
@@ -96,11 +116,14 @@ describe('renderDesign', () => {
     assert.match(html, /tree-toggle/)
     assert.match(html, /tree-guide/)
     assert.match(html, /scrollTo/)
+    assert.match(html, /breaks: diagnosis/)
     assert.match(html, /nav-title/)
     assert.match(html, /目录/)
     assert.doesNotMatch(html, /side-note|class="status"|class="footer"|class="subtitle"/)
     assert.match(html, /\.coder\/design\/file\.md/)
     assert.match(html, /\.coder\/design\/data_structure\.md/)
+    assert.match(html, /\.coder\/diagnosis\/error\.md/)
+    assert.match(html, /W0001/)
     assert.match(html, /interface Diagnostic/)
     assert.match(html, /doc-fallback/)
     assert.match(html, /href="#architecture"/)
@@ -139,6 +162,18 @@ describe('renderDesign', () => {
     assert.equal(result.ok, true)
     assert.equal(result.healthy, false)
     assert.deepEqual(result.missing, ['.coder/design/flow.md'])
+    const html = readFileSync(result.output, 'utf8')
+    assert.match(html, /"present":false/)
+    assert.match(html, /doc-missing/)
+  })
+
+  it('缺失诊断文档时仍然生成页面并标记缺失', async () => {
+    const root = writeProject()
+    rmSync(join(root, '.coder', 'diagnosis', 'error.md'))
+    const result = await renderDesign({ root })
+    assert.equal(result.ok, true)
+    assert.equal(result.healthy, false)
+    assert.deepEqual(result.missing, ['.coder/diagnosis/error.md'])
     const html = readFileSync(result.output, 'utf8')
     assert.match(html, /"present":false/)
     assert.match(html, /doc-missing/)

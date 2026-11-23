@@ -44,6 +44,23 @@ flowchart TD
 \`\`\`
 `
 
+const ERROR_OK = `# E0001
+作用范围：全局
+诊断方式：静态代码审查
+步骤1：查看 [**] 入口代码，如果缺少导出，则认定为 E0001，否则继续。
+步骤2：查看 [**] 注册代码，如果工具未注册，则认定为 E0001，否则继续。
+`
+
+const WARN_OK = `# W0001
+作用范围：全局
+诊断方式：运行时日志审查
+步骤1：在 [**] 检查点，插入日志：
+\`\`\`ts
+console.log('warn')
+\`\`\`
+步骤2：查看日志，如果出现警告，则认定为 W0001，否则继续。
+`
+
 const DATA_OK = `## 诊断
 \`\`\`ts
 export interface Diagnostic {
@@ -101,10 +118,13 @@ function mount() {
 function writeProject() {
   const root = mkdtempSync(join(tempRoot, 'project-'))
   mkdirSync(join(root, '.coder', 'design'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'diagnosis'), { recursive: true })
   writeFileSync(join(root, '.coder', 'design', 'file.md'), FILE_OK)
   writeFileSync(join(root, '.coder', 'design', 'architecture.md'), ARCHITECTURE_OK)
   writeFileSync(join(root, '.coder', 'design', 'flow.md'), FLOW_OK)
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
+  writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
   return root
 }
 
@@ -163,7 +183,7 @@ describe('list tool', () => {
     assert.equal(report.ok, true)
     assert.equal(report.root, root)
     assert.equal(report.docsRoot, join(root, '.coder'))
-    assert.equal(report.summary.found, 4)
+    assert.equal(report.summary.found, 6)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 
