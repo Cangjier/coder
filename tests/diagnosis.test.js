@@ -427,6 +427,16 @@ describe('inspectDiagnosis 文档结构', () => {
     assert.equal(rules(fencedResult, 'diagnosis.no-code').length, 1)
     assert.equal(fencedResult.codes.length, 0)
   })
+
+  it('空文档表示还没有诊断码，不产生诊断', () => {
+    const empty = inspectDiagnosis(DOC, '', 'error', ['src/a.js'])
+    assert.deepEqual(empty.diagnostics, [])
+    assert.deepEqual(empty.codes, [])
+
+    const blank = inspectDiagnosis(DOC, '  \n\t\n', 'error', ['src/a.js'])
+    assert.deepEqual(blank.diagnostics, [])
+    assert.deepEqual(blank.codes, [])
+  })
 })
 
 describe('scopeMatches', () => {

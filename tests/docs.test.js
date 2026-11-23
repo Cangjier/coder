@@ -200,6 +200,27 @@ describe('inspectDocs', () => {
     assert.equal(missing.path, '.coder/design/flow.md')
   })
 
+  it('空诊断文档表示还没有诊断码，不算缺失也不产生诊断', async () => {
+    const root = writeTree({
+      '.coder/design/file.md': FILE_OK,
+      '.coder/design/architecture.md': ARCHITECTURE_OK,
+      '.coder/design/flow.md': FLOW_OK,
+      '.coder/design/data_structure.md': DATA_OK,
+      '.coder/diagnosis/error.md': '',
+      '.coder/diagnosis/warn.md': '',
+      '.coder/plan/todo.md': PLAN_TODO,
+      '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
+      '.coder/plan/goal.md': PLAN_GOAL,
+      '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+    })
+    const report = await inspect(root)
+    assert.equal(report.ok, true)
+    assert.deepEqual(report.missing, [])
+    assert.deepEqual(report.diagnostics, [])
+    assert.equal(report.summary.found, 10)
+    assert.equal(report.summary.codes, 0)
+  })
+
   it('docs 目录不存在时把全部预期文档列为缺失', async () => {
     const root = mkdtempSync(join(tempRoot, 'empty-'))
     const report = await inspect(root)
