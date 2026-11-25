@@ -2,17 +2,23 @@
 #
 # 只贡献一行 Host 插件：coder。
 #
-#   coder  注册两个工具：
+#   coder  注册六个工具：
 #
-#     list    扫描项目根目录下的 `.coder/` 文档树：
-#             - 罗列所有文档；
-#             - 把不在预期集合里的文档标为非法文档；
-#             - 列出缺失的预期文档；
-#             - 按 docs/design.md 的格式约定诊断 file.md / architecture.md / flow.md。
+#     list          扫描项目根目录下的 `.coder/` 文档树：
+#                   - 罗列所有文档；
+#                   - 把不在预期集合、也不在可选白名单里的文档标为非法文档；
+#                   - 列出缺失的预期文档；
+#                   - 按 docs/design.md 的格式约定诊断设计、诊断、计划、模块、成员与问题文档。
 #
-#     render  把 `.coder/design/` 渲染成一个 `design.html`，默认写到
-#             `dist/.coder/design.html`。页面内嵌文档与诊断结果，Markdown 由
-#             marked 渲染，Mermaid 图由 mermaid 渲染。
+#     render        把 `.coder/design/`、存在的模块详情和成员文档渲染成一个 `design.html`，
+#                   默认写到 `dist/.coder/design.html`。Markdown 由 marked 渲染，
+#                   Mermaid 图由 mermaid 渲染。
+#
+#     lock/unlock   写入或删除 `.coder/lock.md`，管理 hash 与授权原文。
+#
+#     update        用 `tmp/` 下的源文件替换 `.coder/` 下的文档；上锁时分两步。
+#
+#     create_issue  在 `.coder/issues/` 下登记实施过程中发现的问题。
 #
 # 文档目录、预期文档、输出文件和格式规则都是固化的：这个插件不接受配置。
 

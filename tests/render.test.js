@@ -10,7 +10,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { renderDesign } from '../src/render.js'
 import { createLockTool } from '../src/tools/lock.js'
-import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
+import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# src
 源代码目录
@@ -92,6 +92,7 @@ function writeProject(label = 'project') {
   writeFileSync(join(root, '.coder', 'design', 'architecture.md'), ARCHITECTURE_OK)
   writeFileSync(join(root, '.coder', 'design', 'flow.md'), FLOW_OK)
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
+  writeFileSync(join(root, '.coder', 'design', 'modules.md'), MODULES_EMPTY)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
   mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
@@ -109,7 +110,7 @@ describe('renderDesign', () => {
     assert.equal(result.ok, true)
     assert.equal(result.output, join(root, 'dist', '.coder', 'design.html'))
     assert.equal(result.healthy, true)
-    assert.equal(result.summary.found, 10)
+    assert.equal(result.summary.found, 11)
     assert.ok(existsSync(result.output))
 
     const html = readFileSync(result.output, 'utf8')

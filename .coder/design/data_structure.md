@@ -1,6 +1,6 @@
 # 数据结构
 
-只记录跨模块传递的关键结构：诊断、诊断码、计划条目、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
+只记录跨模块传递的关键结构：诊断、诊断码、计划条目、模块条目、问题条目、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
 
 ## 诊断
 
@@ -98,9 +98,81 @@ export interface PlanEntry {
 }
 ```
 
+## 模块条目
+
+`modules.md` 解析出的索引条目，以及存在的模块详情；模块详情里的子模块用编码引用另一个模块。
+
+```ts
+export interface ModuleEntry {
+  /** 展示用文档路径，例如 .coder/design/modules.md */
+  doc: string
+  /** 编码标题所在行 */
+  line: number
+  /** 0001 */
+  code: string
+  /** 模块说明 */
+  description: string
+}
+
+export interface ModuleSubmodule {
+  doc: string
+  line: number
+  /** 0002 */
+  code: string
+  description: string
+}
+
+export interface ModuleDoc {
+  /** 展示用文档路径，例如 .coder/design/module-0001.md */
+  doc: string
+  /** 相对于 .coder/ 的路径 */
+  relative: string
+  /** 模块自己的 4 位编码 */
+  code: string | null
+  submodules: ModuleSubmodule[]
+}
+```
+
+## 问题条目
+
+`issue-NNNN.md` 是详情，`open.md` 与 `close.md` 是索引；三个文件都可选。
+
+```ts
+export type IssueStatus = '开启' | '关闭'
+
+export interface IssueFile {
+  doc: string
+  path: string
+  relative: string
+  /** 从文件名取出的 4 位编码 */
+  code: string | null
+  /** 详情里的状态；格式无效时为 null */
+  status: IssueStatus | null
+}
+
+export interface IssueIndexEntry {
+  doc: string
+  line: number
+  /** 0001 */
+  code: string
+  /** open.md 的进度通配；close.md 为 undefined */
+  scope?: string | null
+  /** open.md 的进度说明；close.md 为关闭原因 */
+  text?: string | null
+  /** 进度通配命中的项目文件数；未检查时为 null */
+  matches?: number | null
+}
+
+export interface IssueReport {
+  open: IssueIndexEntry[]
+  close: IssueIndexEntry[]
+  all: IssueFile[]
+}
+```
+
 ## 文档条目
 
-`.coder/` 下扫描到的每个文件都变成一条文档条目，预期、非法和缺失共用同一种形状。
+`.coder/` 下扫描到的每个文件都变成一条文档条目，预期、可选、非法和缺失共用同一种形状。
 
 ```ts
 export type DocumentKind =
@@ -108,16 +180,23 @@ export type DocumentKind =
   | 'architecture'
   | 'flow'
   | 'data'
+  | 'modules'
+  | `module-${string}`
   | 'diagnosis-error'
   | 'diagnosis-warn'
   | 'plan-todo'
   | 'plan-todo-archived'
   | 'plan-goal'
   | 'plan-goal-archived'
+  | 'issue-all'
+  | 'issue-open'
+  | 'issue-close'
+  | 'members-all'
+  | 'members-flow'
   | 'lock'
   | 'generic'
 
-export type DocumentStatus = 'expected' | 'illegal' | 'missing' | 'lock'
+export type DocumentStatus = 'expected' | 'optional' | 'illegal' | 'missing' | 'lock'
 
 export interface DocumentEntry {
   /** 展示用路径，例如 .coder/design/flow.md */
@@ -145,6 +224,8 @@ export interface Summary {
   found: number
   /** 非法文档数 */
   illegal: number
+  /** 可选文档数 */
+  optional: number
   /** 缺失文档数 */
   missing: number
   /** 诊断条数 */
@@ -153,6 +234,16 @@ export interface Summary {
   codes: number
   /** 解析出的计划条目数量 */
   plans: number
+  /** 模块索引条目数 */
+  modules: number
+  /** 存在的模块详情数 */
+  moduleFiles: number
+  /** 问题详情数 */
+  issues: number
+  /** 进行中问题数 */
+  openIssues: number
+  /** 已关闭问题数 */
+  closedIssues: number
   /** .coder/lock.md 是否存在 */
   locked: boolean
 }
@@ -175,6 +266,12 @@ export interface Report {
   diagnoses: DiagnosisCode[]
   /** 四份计划文档解析出的计划条目 */
   plans: PlanEntry[]
+  /** modules.md 解析出的模块索引 */
+  modules: ModuleEntry[]
+  /** 存在的模块详情 */
+  moduleDocs: ModuleDoc[]
+  /** 问题详情与索引 */
+  issues: IssueReport
   summary: Summary
   /** 锁的状态；未上锁时为 null */
   lock: LockReport | null
@@ -185,7 +282,7 @@ export interface Report {
 
 ## 渲染
 
-渲染接收十份预期文档的正文，输出页面路径、字节数和当前的检查状态。
+渲染接收十一份预期文档、存在的模块详情与存在的成员文档的正文，输出页面路径、字节数和当前的检查状态。
 
 ```ts
 export interface RenderDocument {

@@ -2,7 +2,7 @@ coder 的设计目标是提供一系列确定性工具，驱动 dsh 实现符合
 
 # DESIGN
 
-设计文档在 `.coder/design/` 下，包括 `file.md`、`architecture.md`、`flow.md`、`data_structure.md`；诊断文档在 `.coder/diagnosis/` 下，包括 `error.md` 和 `warn.md`；计划文档在 `.coder/plan/` 下，包括 `todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md`。
+设计文档在 `.coder/design/` 下，包括 `file.md`、`architecture.md`、`flow.md`、`data_structure.md`、`modules.md` 和可选的 `module-NNNN.md`；诊断文档在 `.coder/diagnosis/` 下，包括 `error.md` 和 `warn.md`；计划文档在 `.coder/plan/` 下，包括 `todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md`；问题文档在 `.coder/issues/` 下，包括可选的 `all/issue-NNNN.md`、`open.md` 和 `close.md`；成员文档在 `.coder/members/` 下，包括可选的 `all.md` 和 `flow.md`。
 
 ## file.md
 
@@ -46,6 +46,61 @@ coder 的设计目标是提供一系列确定性工具，驱动 dsh 实现符合
 ## data_structure.md
 
 描述关键数据结构，用 `ts` 围栏和 TypeScript `interface` 表达。只记录跨模块传递的关键结构；解析器内部的行、围栏等中间结构留在代码里。
+
+## design/modules.md 与 design/module-NNNN.md
+
+模块文档是设计文档的枝干/叶子：`architecture.md` 是顶层设计，`modules.md` 是模块索引，`module-NNNN.md` 把复杂模块的架构、流程和数据结构拆出来。
+
+`modules.md` 用 4 位编码组织，每个编码后面是模块说明：
+
+```md
+# 0001
+文档检查：扫描 .coder 文档树并逐份诊断。
+```
+
+`module-NNNN.md` 复用设计文档的结构，把三类内容放在一级标题下：
+
+````md
+# 架构
+## 全局视角
+模块的全局结构。
+```mermaid
+flowchart TB
+  subgraph 层
+    A[扫描]
+  end
+```
+## 局部视角：诊断
+可选，模块需要时再写。
+```mermaid
+flowchart LR
+  A --> B
+```
+# 流程
+## 检查文档
+```mermaid
+flowchart TD
+  A --> B
+```
+# 数据结构
+## 模块条目
+```ts
+export interface ModuleEntry {
+  code: string
+}
+```
+# 子模块
+## 0002
+子模块说明。
+````
+
+- `modules.md` 是预期文档；空文件合法，表示还没有需要拆分的模块。
+- `modules.md` 只用一级标题写 4 位模块编码；编码唯一，每个编码后面至少一行说明。
+- 模块索引里的每个编码都要有 `design/module-NNNN.md`；存在的模块详情也必须出现在索引里。
+- `module-NNNN.md` 必填 `# 架构`、`# 流程`、`# 数据结构`，可选 `# 子模块`；一级段落按这个顺序出现。
+- `# 架构` 的 `## 全局视角` 必须有说明和一张带 `subgraph` 的 Mermaid 图；`## 局部视角：<名称>` 可选，写了就按 architecture.md 的规则检查。
+- `# 流程` 和 `# 数据结构` 分别复用 flow.md、data_structure.md 的规则。
+- `# 子模块` 用 `## 0002` 加说明表达；子模块编码必须指向存在的模块，不能引用自己，也不能重复。
 
 ## diagnosis/error.md 与 warn.md
 
@@ -144,6 +199,79 @@ console.log({ recorded, current })
 - 同一个编码同时出现在 active 与 archived 文档时报 `plan.code.archived-duplicate`。
 - 归档时用 `update` 替换 active 与 archived 文档，把完成条目从 active 移入 archived。
 
+## issues/all/issue-NNNN.md、open.md 与 close.md
+
+问题文档记录当前框架在实施过程中发现的问题：实现某个需求或运行某个工具时，框架本身暴露出的缺陷、缺口或需要调整的约定。它不是需求清单，也不是通用的用户工单；一条问题应当能指向实施过程中实际遇到的障碍。问题详情放在 `issues/all/issue-NNNN.md`：
+
+```md
+# 问题
+列表漏报了 flow.md 的格式问题。
+
+# 状态
+开启
+
+# 复现
+1. 把 flow.md 的 mermaid 代码块删掉。
+2. 运行 list。
+
+# 建议
+补上 flow.scenario.no-diagram。
+
+# 提交源
+用户
+```
+
+`open.md` 记录进行中问题的进度，每条是一级标题编码加一行进度：
+
+```md
+# 0001
+[src/**] 当前进度为 正在补检查。
+```
+
+`close.md` 记录已关闭问题的原因：
+
+```md
+# 0001
+已补上检查并验证。
+```
+
+- 三个文件都是可选的：`list` 只在文件存在时检查内容格式，文件不存在不报缺失。
+- 问题编码固定 4 位数字，同一份索引里不能重复；同一个编码不能同时出现在 open.md 与 close.md。
+- `issue-NNNN.md` 必填 `# 问题`、`# 状态`、`# 提交源`，可选 `# 复现`、`# 建议`；段落按这个顺序出现，每个存在的段落至少一行正文。
+- `# 问题` 描述实施过程中遇到的框架问题；`# 提交源` 记录发现问题的来源（例如某个工具、某份文档或某次实施步骤）。
+- `# 状态` 只能是 `开启` 或 `关闭`；`# 复现（可选）`、`# 建议（可选）` 这两种写法也接受。
+- open.md 的进度行写成 `[文件路径通配] 当前进度为 ...`，说明这个问题在实施中的处理进度；通配必须合法并至少命中一个项目文件。
+- close.md 的每条编码后面必须有非空的关闭原因，说明问题如何被解决或为什么不再处理。
+- 索引引用的编码必须在 `issues/all/` 下有对应详情文件。
+- `create_issue` 用于在实施过程中登记问题，并把新问题登记到 open.md 或 close.md。
+
+## members/all.md 与 members/flow.md
+
+成员文档记录主对话与成员的身份、工作范围，以及他们之间的工作流程。两个文件都是可选的：`list` 只在文件存在时检查内容格式，文件不存在不报缺失。
+
+成员名册 `all.md` 用一级标题分节：
+
+```md
+# 主对话
+身份：开发
+工作范围：插件设计与实现
+
+# 成员1
+工作区名称：coder
+身份：验证
+工作范围：部署后的只读验证
+```
+
+- `# 主对话` 必须存在，且是第一个一级标题；只能出现一次。
+- 其余一级标题写成 `# 成员N`，N 是正整数（从 1 开始，不接受前导零），同一份文档里成员编号不能重复。
+- 成员可以为零：只有 `# 主对话`、没有任何 `# 成员N` 也是合法状态。
+- `# 主对话` 必填 `身份` 和 `工作范围`；`# 成员N` 必填 `工作区名称`、`身份` 和 `工作范围`。
+- 字段写在节的正文里，每行一个 `字段：值`；顺序固定，值不能为空，同一节里的字段不能重复。
+- 一节的正文只放这些字段行；空行可以忽略，其他正文行报错。
+- 第一个一级标题之前不能有正文。
+
+成员流程 `flow.md` 沿用 `design/flow.md` 的规则：用 `## <场景>` 分段，每个场景至少一段说明和一张非空的 `mermaid` 图。它讲解主对话如何分派任务、等待成员、部署验证，以及如何维护成员身份与工作范围。
+
 ## lock.md
 
 `.coder/lock.md` 是锁状态文件，不是预期文档，`render` 不渲染它。
@@ -158,7 +286,7 @@ console.log({ recorded, current })
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档不在预期之内且不是 `lock.md`，则提示该文档为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`data_structure.md` 会按 `##` 分段检查 `ts` 围栏和 `interface` 声明。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md` 会检查编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md` 和 `members/flow.md` 是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md` 会检查编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文档会检查详情段落、状态、进度行、关闭原因、编码唯一性，以及 open.md 与 close.md 是否冲突、索引是否指向存在的详情文件。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段，以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
 ### 预期文档
 
@@ -168,6 +296,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 | `.coder/design/architecture.md` | 多视角架构图 |
 | `.coder/design/flow.md` | 主要场景流程 |
 | `.coder/design/data_structure.md` | 关键数据结构 |
+| `.coder/design/modules.md` | 模块索引 |
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
 | `.coder/plan/todo.md` | T 开头的进行中待办 |
@@ -175,7 +304,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 | `.coder/plan/goal.md` | G 开头的进行中目标 |
 | `.coder/plan/goal-archived.md` | G 开头的已归档目标 |
 
-`.coder/lock.md` 是唯一的非预期白名单文件，状态为 `lock`，不计入预期文档，也不渲染。预期文档集合是固化的，不接受配置。
+`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。`.coder/issues/open.md`、`.coder/issues/close.md`、`.coder/issues/all/issue-NNNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md` 和 `.coder/members/flow.md` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
 
 ### 格式约定
 
@@ -213,6 +342,18 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 - 每个 `ts` 围栏至少有一个 `interface <名称>` 声明；全篇的 interface 名称唯一。
 - 只描述跨模块的关键结构；局部临时结构留在代码里。
 
+#### design/modules.md 与 design/module-NNNN.md
+
+- `modules.md` 可以留空；非空时只用一级标题写 `\d{4}` 模块编码，编码唯一、不能有正文前导。
+- 每个模块编码后面至少有一行说明；`##` 及其他标题级别报 `modules.heading.level`。
+- `modules.md` 里登记的每个编码都要有 `design/module-NNNN.md`，否则报 `module.file.missing`。
+- 存在的 `design/module-NNNN.md` 必须出现在 `modules.md` 里，否则报 `module.index.missing`。
+- `module-NNNN.md` 的一级段落依次是 `# 架构`、`# 流程`、`# 数据结构`，`# 子模块` 可选；必填段落缺失、重复、未知或顺序错误都会报 `module.section.*`。
+- `# 架构` 至少有一个 `## 全局视角`，必须有说明和一张以 `flowchart`/`graph` 开头、包含 `subgraph` 的 Mermaid 图；`## 局部视角：<名称>` 可选，写了就按 architecture.md 的规则检查。
+- `# 流程` 按 flow.md 的规则检查：每个 `## <场景>` 至少一张非空 Mermaid 图。
+- `# 数据结构` 按 data_structure.md 的规则检查：每个 `## <名称>` 至少一个非空 `ts` 围栏，并含 `interface`。
+- `# 子模块` 用 `## NNNN` 加说明表达；编码必须是 4 位数字、不能引用自己、不能重复，且必须指向存在的模块文件，否则报 `module.submodule.*`。
+
 #### diagnosis/error.md 与 warn.md
 
 - 文档由一级标题的诊断码组成，例如 `# E0001`；`error.md` 只允许 `E\d{4}`，`warn.md` 只允许 `W\d{4}`。
@@ -249,6 +390,30 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 - 空计划文档合法。
 - 计划文档的字段之间空一行，Markdown 才会逐行显示。
 
+#### issues/all/issue-NNNN.md、open.md 与 close.md
+
+- 三个文件都是可选的；文件不存在时不报缺失，存在时按下面的规则检查。
+- `issue-NNNN.md` 只用一级标题写 `# 问题`、`# 状态`、`# 复现`、`# 建议`、`# 提交源`，顺序固定；`# 复现`、`# 建议` 可省略，也可写成 `# 复现（可选）`、`# 建议（可选）`。
+- `# 问题`、`# 状态`、`# 提交源` 必填；每个存在的段落至少一行非空正文。
+- `# 状态` 只能是 `开启` 或 `关闭`，否则报 `issue.status.value`。
+- open.md 与 close.md 只用一级标题写 4 位问题编码；编码重复报 `issue.code.duplicate`。
+- open.md 的每个编码后面必须有一行 `[文件通配] 当前进度为 ...`；格式错误报 `issue.progress.format`，通配非法报 `issue.progress.glob`，通配没有命中项目文件报 `issue.progress.no-match`。
+- close.md 的每个编码后面必须有非空关闭原因，否则报 `issue.reason.missing`。
+- 同一个编码同时出现在 open.md 与 close.md 报 `issue.status.conflict`。
+- 详情状态与索引不一致报 `issue.status.mismatch`：`开启` 的问题只应出现在 open.md，`关闭` 的问题只应出现在 close.md。
+- 索引里的编码在 `issues/all/` 下没有详情文件时报 `issue.file.missing`。
+- `issues/all/` 下只有 `issue-NNNN.md` 是可选白名单；其他文件报为非法文档。
+
+#### members/all.md 与 members/flow.md
+
+- 两个文件都是可选的；文件不存在时不报缺失，存在时按下面的规则检查。
+- `all.md` 只用一级标题分节；`# 主对话` 必须存在、只能出现一次，而且是第一个一级标题，否则报 `members.main.missing`、`members.main.duplicate` 或 `members.main.order`。
+- 其余一级标题必须是 `# 成员N`，N 是正整数且不接受前导零；编号重复报 `members.member.duplicate`，写成 `# 成员` 等非法形式报 `members.member.format`，其他标题报 `members.section.unknown`。
+- `# 主对话` 必填 `身份`、`工作范围`；`# 成员N` 必填 `工作区名称`、`身份`、`工作范围`。字段顺序固定，值不能为空；缺字段、空值、重复字段、顺序错误或出现不支持的字段分别报 `members.field.missing`、`members.field.empty`、`members.field.duplicate`、`members.field.order`、`members.field.unexpected`。
+- 每节正文每行一个 `字段：值`，空行忽略；其他正文行报 `members.body`。`##` 及其他标题级别报 `members.heading.level`。
+- 第一个一级标题之前不能有正文，否则报 `members.preamble`。
+- `flow.md` 按 `design/flow.md` 的规则检查：每个 `## <场景>` 至少一段说明和一张非空的 `mermaid` 图；缺少场景、场景为空、缺少图或图为空分别报 `flow.no-scenario`、`flow.scenario.empty`、`flow.scenario.no-diagram`、`flow.diagram.empty`。
+
 #### lock.md
 
 - 第一行必须与固定声明逐字一致，否则报 `lock.declaration`。
@@ -261,10 +426,15 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 
 `list` 返回一份结构化结果，并在 `text` 中给出可直接阅读的汇总：
 
-- `documents`：`.coder/` 下发现的全部文档，状态为 `expected`、`illegal`、`missing` 或 `lock`。
-- `illegal` / `missing`：非法文档与缺失文档的路径清单；`lock.md` 不在其中。
+- `documents`：`.coder/` 下发现的全部文档，状态为 `expected`、`optional`、`illegal`、`missing` 或 `lock`。
+- `illegal` / `missing`：非法文档与缺失文档的路径清单；`lock.md` 不在其中，可选的模块详情、问题文档与成员文档也不计入缺失。
 - `lock`：`present`、`declarationValid`、`hash`、`hashMatches`、`currentHash`、`authorizationLength`；未上锁时为 `null`。
 - `summary.locked`：是否存在 `lock.md`。
+- `modules`：`modules.md` 里解析出的模块索引，包含 `code`、`line`、`description`。
+- `moduleDocs`：存在的模块详情，包含 `code`、`path`、`submodules`。
+- `issues`：`open`、`close`、`all` 三组问题条目；`all` 包含 `code`、`path`、`status`。
+- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues`：模块、模块详情与问题数量。
+- `summary.optional`：存在的可选文档数量。
 - `diagnostics`：每条诊断包含 `doc`、`line`（能定位时）、`rule` 与 `message`。
 - `diagnoses`：两份诊断文档里解析出的诊断码，包含 `code`、`severity`、`scope`、`scopeKind`、`method`、`steps`、`matches`。
 - `summary.codes`：解析出的诊断码数量。
@@ -274,13 +444,14 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 
 ## render
 
-`render` 把 `.coder/` 的十份预期文档渲染成一个 `design.html`。
+`render` 把 `.coder/` 的十一份预期文档、存在的模块详情和存在的成员文档渲染成一个 `design.html`。
 
 - 默认输出目录：`dist/.coder/`；文件名固定 `design.html`。
 - 调用参数 `out` 可以指定另一个输出目录。
-- 页面内嵌十份文档；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，plan 下的四份文档渲染为 Markdown 计划条目，左侧是目录。
+- 页面内嵌十一份预期文档、`design/module-NNNN.md` 和存在的 `members/all.md` / `members/flow.md`；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，modules.md 与模块详情渲染为 Markdown，成员文档渲染为 Markdown，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，plan 下的四份文档渲染为 Markdown 计划条目，左侧是目录。
+- 问题文档属于实施过程记录，不进入渲染页面；成员文档存在时进入页面，不存在时页面不显示空区块。
 - 页面不显示额外的状态或提示文案。
-- 页面在服务端预置十份文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
+- 页面在服务端预置全部被渲染文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
 - Markdown 由 marked 渲染，Mermaid 图由 mermaid 渲染，两者从 jsDelivr 加载。
 - CDN 不可用时保留源码正文与图表源码。
 - 同样的文档得到同样的 HTML：不写时间戳，不读环境信息。
@@ -338,3 +509,27 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。如果该文档
 - `supplement`：在当前分支提交目标文件与 lock.md。
 - `adjustment`：先把当前工作区提交为 checkpoint，按传入的 `branch` 新建分支，再替换、更新 hash 并提交。
 - 不 push；不做复杂回滚，git 和 dsh 的 fs 沙盒是保底。
+
+## create_issue
+
+`create_issue` 在实施过程中登记当前框架发现的问题。
+
+输入：
+
+- `problem`（必填）：`# 问题` 的正文。
+- `source`（必填）：`# 提交源`，记录发现问题的工具、文档或实施步骤。
+- `status`：`开启` 或 `关闭`，默认 `开启`。
+- `reproduce` / `suggestion`（可选）：写入 `# 复现` / `# 建议`。
+- `scope`（可选）：open.md 进度行里的文件路径通配，默认 `**`。
+- `progress`（可选）：open.md 的进度说明，默认「已登记，等待处理。」。
+- `closeReason`（可选）：关闭状态的 close.md 原因，默认「已关闭。」。
+
+行为：
+
+- 扫描 `.coder/issues/all/issue-NNNN.md`、open.md 与 close.md，取已用编码最大值加一，从 `0001` 开始；编码固定 4 位。
+- 写 `.coder/issues/all/issue-NNNN.md`，内容按固定段落生成。
+- `开启` 时追加到 `issues/open.md`，写入 `[scope] 当前进度为 ...`；`关闭` 时追加到 `issues/close.md`，写入关闭原因。
+- 索引文件不存在时创建；已有索引内容不合法时拒绝追加，不写任何文件。
+- 生成的内容先自检，自检不过不落盘；详情写成功但索引失败时删除刚创建的详情。
+- `.coder` 已上锁时拒绝写入：问题文档要么先 unlock，要么经 update 流程提交。
+- 不提交 git。

@@ -13,7 +13,7 @@ import { after, before, describe, it } from 'node:test'
 
 import * as plugin from '../index.js'
 import { apply, name as pluginName } from '../index.js'
-import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
+import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# src
 源代码目录
@@ -124,6 +124,7 @@ function writeProject() {
   writeFileSync(join(root, '.coder', 'design', 'architecture.md'), ARCHITECTURE_OK)
   writeFileSync(join(root, '.coder', 'design', 'flow.md'), FLOW_OK)
   writeFileSync(join(root, '.coder', 'design', 'data_structure.md'), DATA_OK)
+  writeFileSync(join(root, '.coder', 'design', 'modules.md'), MODULES_EMPTY)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
   mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
@@ -138,7 +139,7 @@ describe('plugin wiring', () => {
   it('插件名与工具名符合设计', () => {
     assert.equal(pluginName, 'coder')
     const { tools } = mount()
-    assert.deepEqual([...tools.keys()], ['list', 'render', 'lock', 'unlock', 'update'])
+    assert.deepEqual([...tools.keys()], ['list', 'render', 'lock', 'unlock', 'update', 'create_issue'])
     const definition = tools.get('list')
     assert.equal(definition.name, 'list')
     assert.equal(definition.parameters.type, 'object')
@@ -152,6 +153,18 @@ describe('plugin wiring', () => {
     }
     const update = tools.get('update')
     assert.deepEqual(Object.keys(update.parameters.properties), ['root', 'updates', 'key', 'decision', 'review', 'branch'])
+    const createIssue = tools.get('create_issue')
+    assert.deepEqual(Object.keys(createIssue.parameters.properties), [
+      'root',
+      'problem',
+      'source',
+      'status',
+      'reproduce',
+      'suggestion',
+      'scope',
+      'progress',
+      'closeReason',
+    ])
   })
 
   it('不导出 Config，文档集合固化', () => {
@@ -189,7 +202,7 @@ describe('list tool', () => {
     assert.equal(report.ok, true)
     assert.equal(report.root, root)
     assert.equal(report.docsRoot, join(root, '.coder'))
-    assert.equal(report.summary.found, 10)
+    assert.equal(report.summary.found, 11)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 

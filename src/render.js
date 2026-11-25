@@ -1,5 +1,6 @@
 /**
- * 把 `.coder/` 的预期文档渲染成一个 `design.html`。
+ * 把 `.coder/` 的预期文档、存在的模块详情和存在的成员文档渲染成一个
+ * `design.html`。
  *
  * 页面只表达文档本身：
  *
@@ -7,12 +8,14 @@
  * - file.md 渲染成树表格；
  * - architecture.md / flow.md 渲染成 Markdown，Mermaid 图由浏览器绘制；
  * - data_structure.md 渲染成 Markdown，TypeScript 代码块按原文展示；
+ * - modules.md 与 module-NNNN.md 渲染成 Markdown；
+ * - members/all.md 与 members/flow.md 存在时渲染成 Markdown；
  * - diagnosis/error.md 与 warn.md 渲染成 Markdown 诊断码目录；
  * - plan/todo.md、todo-archived.md、goal.md 与 goal-archived.md 渲染成 Markdown 计划条目；
  * - 不显示状态卡、页脚、说明文案或回退提示。
  *
  * Markdown 由 `marked` 渲染，Mermaid 由 `mermaid` 渲染，两者从 jsDelivr
- * 加载。页面在服务端预置全部预期文档的源码：脚本不可用时它就是可读的正文；
+ * 加载。页面在服务端预置全部被渲染文档的源码：脚本不可用时它就是可读的正文；
  * 脚本可用时升级为树表格 / Markdown / Mermaid。CDN 不可用时保留源码。
  *
  * 这里不生成时间戳，也不读环境信息：同样的文档永远得到同样的 HTML。
@@ -53,7 +56,7 @@ function escapeHtml(value) {
  * 脚本不可用时，这就是页面正文：全部文档以纯文本呈现，至少可读；
  * 脚本可用时，前端把它替换成树表格 / Markdown / Mermaid。
  *
- * @param {{path: string, kind: string, present: boolean, content: string}[]} docs - 全部预期文档。
+ * @param {{path: string, kind: string, present: boolean, content: string}[]} docs - 全部被渲染文档。
  * @returns {string} 文档区块的 HTML。
  */
 function renderFallbackSections(docs) {
@@ -69,9 +72,9 @@ function renderFallbackSections(docs) {
 }
 
 /**
- * 服务端预置的目录，列出全部预期文档；前端会在此基础上补文档内标题。
+ * 服务端预置的目录，列出全部被渲染文档；前端会在此基础上补文档内标题。
  *
- * @param {{path: string, kind: string}[]} docs - 全部预期文档。
+ * @param {{path: string, kind: string}[]} docs - 全部被渲染文档。
  * @returns {string} 目录的 HTML。
  */
 function renderStaticNav(docs) {
@@ -85,7 +88,7 @@ function renderStaticNav(docs) {
  * 构造单页 HTML。
  *
  * @param {object} input - 输入。
- * @param {{path: string, kind: string, present: boolean, content: string}[]} input.docs - 全部预期文档。
+ * @param {{path: string, kind: string, present: boolean, content: string}[]} input.docs - 全部被渲染文档。
  * @returns {string} HTML 文本。
  */
 function buildHtml({ docs }) {
@@ -652,7 +655,7 @@ ${renderFallbackSections(docs)}
 }
 
 /**
- * 渲染 `.coder/` 的预期文档到 `design.html`。
+ * 渲染 `.coder/` 的预期文档、模块详情与成员文档到 `design.html`。
  *
  * @param {object} options - 选项。
  * @param {string} options.root - 项目根目录。
@@ -665,7 +668,26 @@ export async function renderDesign({ root, outDir }) {
   const report = await inspectDocs({ root: absoluteRoot })
 
   const docs = []
+  const moduleDocs = report.documents
+    .filter((document) => document.status === 'optional' && document.kind.startsWith('module-'))
+    .map((document) => document.relative)
+    .sort((a, b) => a.localeCompare(b))
+  const memberDocs = report.documents
+    .filter(
+      (document) =>
+        document.status === 'optional' &&
+        (document.kind === 'members-all' || document.kind === 'members-flow'),
+    )
+    .map((document) => document.relative)
+    .sort((a, b) => a.localeCompare(b))
+  const relatives = []
   for (const relative of EXPECTED_DOCS) {
+    relatives.push(relative)
+    if (relative === 'design/modules.md') relatives.push(...moduleDocs)
+  }
+  relatives.push(...memberDocs)
+
+  for (const relative of relatives) {
     const absolute = path.join(absoluteRoot, DOCS_DIR, ...relative.split('/'))
     let content = ''
     let present = true
@@ -714,7 +736,7 @@ export async function renderDesign({ root, outDir }) {
       `已生成 ${OUTPUT_FILE}`,
       `输出：${output}`,
       `大小：${bytes} 字节`,
-      `文档：${report.summary.found}/${report.summary.expected}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}`,
+      `文档：${report.summary.found}/${report.summary.expected}｜模块 ${report.summary.modules}｜成员 ${memberDocs.length}｜问题 ${report.summary.issues}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}`,
       '在浏览器中打开即可查看；Markdown 与 Mermaid 由 jsDelivr 上的 marked/mermaid 渲染，离线时回退为源码。',
     ].join('\n'),
   }

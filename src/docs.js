@@ -5,11 +5,13 @@
  * `<root>/.coder/` 下的文件全部列出来，与预期集合比对，再按
  * `docs/design.md` 的格式约定逐份诊断。
  *
- * 四份设计文档、两份诊断文档和四份计划文档的规则都以「确定性」为前提，
+ * 五份设计文档、两份诊断文档和四份计划文档的规则都以「确定性」为前提，可选
+ * 的模块详情、问题文档与成员文档共用同一套检查；
  * 所以只做能够机械判定的检查：标题路径是否合法、同一路径是否重复、说明是否
  * 为空、是否有反向表述、视角是否有图、场景是否有 mermaid 图、数据结构是否用
  * ts interface 表达、诊断码与作用范围是否合法、步骤格式与编号、文件通配范围
- * 是否命中、计划编码与字段顺序、编号条目和关联 ToDo 是否合法。
+ * 是否命中、计划编码与字段顺序、编号条目和关联 ToDo 是否合法、模块索引与详情
+ * 是否成对、问题索引与详情是否一致、成员名册的字段与成员流程的场景是否完整。
  * 判不了的（例如图是否真的描述了代码、任务是否真的完成）不猜，也不报。
  *
  * 文档目录、预期文档和格式规则都是固化的，不接受配置。
@@ -20,10 +22,30 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
+import { validateArchitecture, validateData, validateFlow } from './design.js'
 import { DIAGNOSIS_DOCS, diagnosisSeverity, inspectDiagnosis } from './diagnosis.js'
 import { matchGlob } from './glob.js'
+import {
+  ISSUE_CLOSE,
+  ISSUE_OPEN,
+  inspectIssueAll,
+  inspectIssueClose,
+  inspectIssueOpen,
+  isIssueDoc,
+  issueKindOf,
+  issueNumber,
+} from './issue.js'
 import { LOCK_DECLARATION, LOCK_RELATIVE, hashCoder, readLock } from './lock.js'
 import { analyzeMarkdown } from './markdown.js'
+import { inspectMembersAll, inspectMembersFlow, isMemberDoc, memberKindOf } from './member.js'
+import {
+  MODULES_DOC,
+  inspectModule,
+  inspectModules,
+  isOptionalModuleDoc,
+  moduleKindOf,
+  moduleNumber,
+} from './module.js'
 import { PLAN_DOCS, inspectPlan, planKindOf } from './plan.js'
 
 export { analyzeMarkdown }
@@ -37,6 +59,7 @@ export const EXPECTED_DOCS = Object.freeze([
   'design/architecture.md',
   'design/flow.md',
   'design/data_structure.md',
+  MODULES_DOC,
   ...DIAGNOSIS_DOCS,
   ...PLAN_DOCS,
 ])
@@ -68,13 +91,19 @@ export class CoderError extends Error {
  * 目录里同名的 error.md / warn.md / todo.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
- * @returns {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'lock'|'generic'} 文档类型。
+ * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-all'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
  */
 export function kindOf(relative) {
   if (relative === 'diagnosis/error.md') return 'diagnosis-error'
   if (relative === 'diagnosis/warn.md') return 'diagnosis-warn'
   const planKind = planKindOf(relative)
   if (planKind !== null) return planKind
+  const moduleKind = moduleKindOf(relative)
+  if (moduleKind !== null) return moduleKind
+  const issueKind = issueKindOf(relative)
+  if (issueKind !== null) return issueKind
+  const memberKind = memberKindOf(relative)
+  if (memberKind !== null) return memberKind
   const base = path.posix.basename(relative).toLowerCase()
   if (base === 'file.md') return 'file'
   if (base === 'architecture.md') return 'architecture'
@@ -82,6 +111,16 @@ export function kindOf(relative) {
   if (base === 'data_structure.md') return 'data'
   if (base === 'lock.md') return 'lock'
   return 'generic'
+}
+
+/**
+ * 判断一个相对路径是否是可选文档：存在就检查，不存在也不报缺失。
+ *
+ * @param {string} relative - 相对于文档树目录的路径。
+ * @returns {boolean} 是否是可选文档。
+ */
+export function isOptionalDoc(relative) {
+  return isOptionalModuleDoc(relative) || isIssueDoc(relative) || isMemberDoc(relative)
 }
 
 /**
@@ -320,286 +359,12 @@ function validateFile(doc, analysis) {
   return diagnostics
 }
 
-/** 表达数据结构的围栏语言标记。 */
-const DATA_LANGS = new Set(['ts', 'typescript'])
-
-/** TypeScript interface 声明；只认 `interface Name` 后跟 `{`。 */
-const INTERFACE_DECLARATION = /\binterface\s+([A-Za-z_$][\w$]*)\s*(?:<[^>{}\n]*>)?\s*(?:extends\s+[^{}\n]+)?\{/g
-
-/**
- * 校验 data_structure.md。
- *
- * 数据结构用 `## <名称>` 分段，每段用 ```ts 围栏写 TypeScript interface。
- * 只校验能够机械判定的部分：每段至少一个 ts 围栏、围栏非空、里面确实有
- * interface、interface 名称不重复。结构是否关键、字段是否完整无法机械判断。
- *
- * @param {string} doc - 展示用文档路径。
- * @param {ReturnType<typeof analyzeMarkdown>} analysis - 解析结果。
- * @returns {object[]} 诊断。
- */
-function validateData(doc, analysis) {
-  const diagnostics = []
-  const { lines, headings, fences } = analysis
-  const sections = headings
-    .map((heading, index) => ({ heading, index }))
-    .filter((entry) => entry.heading.level === 2)
-
-  if (sections.length === 0) {
-    diagnostics.push(diagnostic(doc, 1, 'data.no-section', 'data_structure.md 里没有 ## 数据结构。'))
-    return diagnostics
-  }
-
-  const blocks = fences.filter((fence) => DATA_LANGS.has(fence.lang))
-  const seen = new Map()
-  const owned = new Set()
-
-  function checkBlock(block) {
-    if (block.content.trim() === '') {
-      diagnostics.push(diagnostic(doc, block.startLine, 'data.ts.empty', '```ts 代码块是空的。'))
-      return
-    }
-    const names = [...block.content.matchAll(INTERFACE_DECLARATION)].map((match) => match[1])
-    if (names.length === 0) {
-      diagnostics.push(
-        diagnostic(doc, block.startLine, 'data.interface.missing', '```ts 代码块里没有 interface 声明。'),
-      )
-      return
-    }
-    for (const name of names) {
-      const first = seen.get(name)
-      if (first === undefined) {
-        seen.set(name, block.startLine)
-      } else {
-        diagnostics.push(
-          diagnostic(
-            doc,
-            block.startLine,
-            'data.interface.duplicate',
-            `interface ${name} 重复定义（第一次出现在第 ${first} 行）。`,
-          ),
-        )
-      }
-    }
-  }
-
-  for (const { heading, index } of sections) {
-    const end = sectionEnd(headings, index, lines.length, 2)
-    const inSection = blocks.filter((block) => block.startLine > heading.line && block.endLine <= end)
-    if (inSection.length === 0) {
-      diagnostics.push(
-        diagnostic(doc, heading.line, 'data.section.no-ts', `数据结构 ${heading.text} 需要一个 \`\`\`ts 代码块。`),
-      )
-      continue
-    }
-    for (const block of inSection) {
-      owned.add(block)
-      checkBlock(block)
-    }
-  }
-
-  for (const block of blocks) {
-    if (!owned.has(block)) checkBlock(block)
-  }
-
-  return diagnostics
-}
-
-/** 全局视角的固定标题。 */
-const GLOBAL_VIEW = '全局视角'
-
-/** 局部视角的标题格式：`局部视角：<名称>`。 */
-const LOCAL_VIEW = /^局部视角\s*[：:]\s*\S/
-
-/**
- * 取某个视角段落里的 mermaid 围栏。
- *
- * @param {ReturnType<typeof analyzeMarkdown>} analysis - 解析结果。
- * @param {number} headingLine - 视角标题所在行。
- * @param {number} endLine - 段落最后一行。
- * @returns {{startLine: number, endLine: number, lang: string, content: string}[]} 围栏。
- */
-function mermaidFencesIn(analysis, headingLine, endLine) {
-  return analysis.fences.filter(
-    (fence) => fence.lang === 'mermaid' && fence.startLine > headingLine && fence.endLine <= endLine,
-  )
-}
-
-/**
- * 取 Mermaid 正文里的第一条有效指令，跳过空行和 `%%` 注释。
- *
- * @param {string} content - 代码块正文。
- * @returns {string} 第一条有效行；没有时为空串。
- */
-function firstDirective(content) {
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (trimmed !== '' && !trimmed.startsWith('%%')) return trimmed
-  }
-  return ''
-}
-
-/**
- * 校验 architecture.md。
- *
- * 架构文档用多张 Mermaid 图表达：第一个 `## 视角` 必须是全局视角，后面是
- * 若干局部视角。每个视角需要一段说明和一张 `flowchart`/`graph` 图；全局
- * 视角还必须用 `subgraph` 表达分层。图是否真的描述了代码无法机械判断，
- * 这里只校验结构。
- *
- * @param {string} doc - 展示用文档路径。
- * @param {ReturnType<typeof analyzeMarkdown>} analysis - 解析结果。
- * @returns {object[]} 诊断。
- */
-function validateArchitecture(doc, analysis) {
-  const diagnostics = []
-  const { lines, headings } = analysis
-  const views = headings
-    .map((heading, index) => ({ heading, index }))
-    .filter((entry) => entry.heading.level === 2)
-
-  if (views.length === 0) {
-    diagnostics.push(diagnostic(doc, 1, 'architecture.no-view', 'architecture.md 里没有 ## 视角。'))
-    return diagnostics
-  }
-
-  const seen = new Map()
-  const globals = []
-
-  for (let position = 0; position < views.length; position += 1) {
-    const { heading, index } = views[position]
-    const name = heading.text.trim()
-    const isGlobal = name === GLOBAL_VIEW
-    const isLocal = LOCAL_VIEW.test(name)
-
-    if (isGlobal) globals.push(heading)
-    if (!isGlobal && !isLocal) {
-      diagnostics.push(
-        diagnostic(doc, heading.line, 'architecture.view.kind', `视角标题必须是 ## ${GLOBAL_VIEW} 或 ## 局部视角：<名称>，收到：${name}`),
-      )
-    }
-    if (seen.has(name)) {
-      diagnostics.push(
-        diagnostic(doc, heading.line, 'architecture.view.duplicate', `视角重复：${name}（第一次出现在第 ${seen.get(name)} 行）。`),
-      )
-    } else {
-      seen.set(name, heading.line)
-    }
-    if (position === 0 && !isGlobal) {
-      diagnostics.push(diagnostic(doc, heading.line, 'architecture.view.order', `${GLOBAL_VIEW} 必须是第一个 ## 视角。`))
-    }
-
-    const end = sectionEnd(headings, index, lines.length, 2)
-    const body = []
-    for (let line = heading.line + 1; line <= end; line += 1) {
-      body.push({ text: lines[line - 1], line })
-    }
-    const outside = body.filter((line) => line.text.trim() !== '' && !analysis.masked[line.line - 1])
-    if (outside.length === 0) {
-      diagnostics.push(
-        diagnostic(doc, heading.line, 'architecture.view.description.missing', `视角 ${name} 需要一段说明。`),
-      )
-    }
-
-    const diagrams = mermaidFencesIn(analysis, heading.line, end)
-    if (diagrams.length === 0) {
-      diagnostics.push(
-        diagnostic(doc, heading.line, 'architecture.view.diagram.missing', `视角 ${name} 需要一个 \`\`\`mermaid 图。`),
-      )
-      continue
-    }
-    for (const extra of diagrams.slice(1)) {
-      diagnostics.push(
-        diagnostic(doc, extra.startLine, 'architecture.view.diagram.multiple', `视角 ${name} 只能有一张图。`),
-      )
-    }
-
-    const diagram = diagrams[0]
-    if (diagram.content.trim() === '') {
-      diagnostics.push(diagnostic(doc, diagram.startLine, 'architecture.diagram.empty', '架构图是空的。'))
-      continue
-    }
-    if (!/^(flowchart|graph)\b/i.test(firstDirective(diagram.content))) {
-      diagnostics.push(
-        diagnostic(doc, diagram.startLine, 'architecture.diagram.type', '架构图必须以 flowchart 或 graph 开头。'),
-      )
-    }
-    if (isGlobal && !/\bsubgraph\b/.test(diagram.content)) {
-      diagnostics.push(
-        diagnostic(doc, diagram.startLine, 'architecture.global.no-subgraph', '全局视角必须用 subgraph 表达分层。'),
-      )
-    }
-  }
-
-  if (globals.length === 0) {
-    diagnostics.push(diagnostic(doc, 1, 'architecture.global.missing', `architecture.md 缺少 ## ${GLOBAL_VIEW}。`))
-  } else {
-    for (const extra of globals.slice(1)) {
-      diagnostics.push(
-        diagnostic(doc, extra.line, 'architecture.global.multiple', `architecture.md 只能有一个 ## ${GLOBAL_VIEW}。`),
-      )
-    }
-  }
-  if (!views.some((entry) => LOCAL_VIEW.test(entry.heading.text.trim()))) {
-    diagnostics.push(diagnostic(doc, 1, 'architecture.local.missing', 'architecture.md 至少需要一个 ## 局部视角：<名称>。'))
-  }
-
-  return diagnostics
-}
-
-/**
- * 校验 flow.md。
- *
- * @param {string} doc - 展示用文档路径。
- * @param {ReturnType<typeof analyzeMarkdown>} analysis - 解析结果。
- * @returns {object[]} 诊断。
- */
-function validateFlow(doc, analysis) {
-  const diagnostics = []
-  const { lines, headings, fences } = analysis
-  const scenarios = headings
-    .map((heading, index) => ({ heading, index }))
-    .filter((entry) => entry.heading.level === 2)
-
-  if (scenarios.length === 0) {
-    diagnostics.push(diagnostic(doc, 1, 'flow.no-scenario', 'flow.md 里没有 ## 场景。'))
-    return diagnostics
-  }
-
-  for (const { heading, index } of scenarios) {
-    const end = sectionEnd(headings, index, lines.length, 2)
-    const body = []
-    for (let line = heading.line + 1; line <= end; line += 1) {
-      if (lines[line - 1].trim() !== '') body.push(line)
-    }
-    if (body.length === 0) {
-      diagnostics.push(diagnostic(doc, heading.line, 'flow.scenario.empty', `场景 ${heading.text} 的正文是空的。`))
-      continue
-    }
-    const diagrams = fences.filter(
-      (fence) => fence.lang === 'mermaid' && fence.startLine > heading.line && fence.startLine <= end && fence.endLine <= end,
-    )
-    if (diagrams.length === 0) {
-      diagnostics.push(
-        diagnostic(doc, heading.line, 'flow.scenario.no-diagram', `场景 ${heading.text} 缺少一个 \`\`\`mermaid 代码块。`),
-      )
-      continue
-    }
-    for (const diagram of diagrams) {
-      if (diagram.content.trim() === '') {
-        diagnostics.push(diagnostic(doc, diagram.startLine, 'flow.diagram.empty', 'mermaid 代码块是空的。'))
-      }
-    }
-  }
-
-  return diagnostics
-}
-
 /**
  * 诊断一份文档。
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文档正文。
- * @param {'file'|'architecture'|'flow'|'data'|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'lock'|'generic'} kind - 文档类型。
+ * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-all'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
  * @param {string[]} [files] - 项目文件；诊断文档用它检查文件通配范围。
  * @returns {object[]} 诊断。
  */
@@ -609,6 +374,15 @@ export function validateDocument(doc, text, kind, files) {
   }
   if (kind.startsWith('plan-')) {
     return inspectPlan(doc, text, kind).diagnostics
+  }
+  if (kind === 'issue-all') return inspectIssueAll(doc, text).diagnostics
+  if (kind === 'issue-open') return inspectIssueOpen(doc, text, files).diagnostics
+  if (kind === 'issue-close') return inspectIssueClose(doc, text).diagnostics
+  if (kind === 'members-all') return inspectMembersAll(doc, text).diagnostics
+  if (kind === 'members-flow') return inspectMembersFlow(doc, text).diagnostics
+  if (kind === 'modules') return inspectModules(doc, text).diagnostics
+  if (kind.startsWith('module-')) {
+    return inspectModule(doc, text, kind.slice('module-'.length)).diagnostics
   }
 
   const diagnostics = []
@@ -704,7 +478,7 @@ function formatReport(report) {
   const lines = [`Coder 文档检查：${report.docsRoot}`]
   if (!report.docsRootExists) lines.push(`（${DOCS_DIR}/ 不存在。）`)
   lines.push(
-    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}${report.summary.locked ? '｜已上锁' : ''}`,
+    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}｜模块 ${report.summary.modules}｜问题 ${report.summary.issues}${report.summary.locked ? '｜已上锁' : ''}`,
   )
   lines.push('')
   lines.push('文档：')
@@ -712,11 +486,13 @@ function formatReport(report) {
     const marker =
       document.status === 'expected'
         ? '[ok]'
-        : document.status === 'illegal'
-          ? '[illegal]'
-          : document.status === 'lock'
-            ? '[lock]'
-            : '[missing]'
+        : document.status === 'optional'
+          ? '[optional]'
+          : document.status === 'illegal'
+            ? '[illegal]'
+            : document.status === 'lock'
+              ? '[lock]'
+              : '[missing]'
     lines.push(`  ${marker} ${document.path}`)
   }
   if (report.diagnoses.length > 0) {
@@ -743,6 +519,27 @@ function formatReport(report) {
       lines.push(
         `  ${item.code} [${item.archived ? '归档' : '进行中'}] ${item.kind}${priority}｜${scope}｜完成预期 ${item.expected}${todos}`,
       )
+    }
+  }
+  if (report.modules.length > 0) {
+    lines.push('')
+    lines.push('模块：')
+    for (const item of report.modules) {
+      lines.push(`  ${item.code}｜${item.description}`)
+    }
+  }
+  if (report.moduleDocs.length > 0) {
+    lines.push('')
+    lines.push('模块详情：')
+    for (const item of report.moduleDocs) {
+      lines.push(`  ${item.code ?? '编码无效'}｜子模块 ${item.submodules.length}`)
+    }
+  }
+  if (report.issues.all.length > 0) {
+    lines.push('')
+    lines.push('问题：')
+    for (const item of report.issues.all) {
+      lines.push(`  ${item.code ?? '编码无效'} [${item.status ?? '状态无效'}]`)
     }
   }
   if (report.diagnostics.length > 0) {
@@ -778,6 +575,9 @@ export async function inspectDocs({ root }) {
   const diagnostics = []
   const diagnoses = []
   const plans = []
+  const modules = []
+  const moduleDocs = []
+  const issues = { open: [], close: [], all: [] }
   let docsRootExists = false
   let discovered = []
   let projectFiles = null
@@ -815,11 +615,12 @@ export async function inspectDocs({ root }) {
 
   for (const relative of discovered) {
     if (expectedSet.has(relative) || relative === LOCK_RELATIVE) continue
+    const optional = isOptionalDoc(relative)
     documents.push({
       path: displayPath(relative),
       relative,
       absolute: path.join(docsRoot, ...relative.split('/')),
-      status: 'illegal',
+      status: optional ? 'optional' : 'illegal',
       exists: true,
       kind: kindOf(relative),
     })
@@ -879,6 +680,33 @@ export async function inspectDocs({ root }) {
       const result = inspectPlan(doc, text, kind)
       diagnostics.push(...result.diagnostics)
       plans.push(...result.entries)
+    } else if (kind === 'issue-all') {
+      const result = inspectIssueAll(doc, text)
+      diagnostics.push(...result.diagnostics)
+      issues.all.push({
+        doc,
+        path: doc,
+        relative,
+        code: issueNumber(relative),
+        status: result.status,
+      })
+    } else if (kind === 'issue-open') {
+      const result = inspectIssueOpen(doc, text, await ensureProjectFiles())
+      diagnostics.push(...result.diagnostics)
+      issues.open.push(...result.entries)
+    } else if (kind === 'issue-close') {
+      const result = inspectIssueClose(doc, text)
+      diagnostics.push(...result.diagnostics)
+      issues.close.push(...result.entries)
+    } else if (kind === 'modules') {
+      const result = inspectModules(doc, text)
+      diagnostics.push(...result.diagnostics)
+      modules.push(...result.entries)
+    } else if (kind.startsWith('module-')) {
+      const moduleCode = moduleNumber(relative)
+      const result = inspectModule(doc, text, moduleCode ?? '')
+      diagnostics.push(...result.diagnostics)
+      moduleDocs.push({ doc, relative, code: moduleCode, submodules: result.submodules })
     } else {
       diagnostics.push(...validateDocument(doc, text, kind))
     }
@@ -903,6 +731,113 @@ export async function inspectDocs({ root }) {
           entry.line,
           'plan.code.archived-duplicate',
           `${entry.code} 同时出现在 ${previous.doc} 与 ${entry.doc}；完成的任务只保留在归档文档中。`,
+        ),
+      )
+    }
+  }
+
+  modules.sort((a, b) => a.line - b.line)
+  moduleDocs.sort((a, b) => a.relative.localeCompare(b.relative))
+  issues.open.sort((a, b) => a.line - b.line)
+  issues.close.sort((a, b) => a.line - b.line)
+  issues.all.sort((a, b) => a.relative.localeCompare(b.relative))
+
+  const indexedModules = new Map(modules.map((entry) => [entry.code, entry]))
+  const moduleFiles = new Map(
+    moduleDocs.filter((entry) => entry.code !== null).map((entry) => [entry.code, entry]),
+  )
+  for (const entry of modules) {
+    if (!moduleFiles.has(entry.code)) {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'module.file.missing',
+          `模块索引登记了 ${entry.code}，但 ${DOCS_DIR}/design/module-${entry.code}.md 不存在。`,
+        ),
+      )
+    }
+  }
+  for (const file of moduleDocs) {
+    if (file.code === null) continue
+    if (!indexedModules.has(file.code)) {
+      diagnostics.push(
+        diagnostic(
+          file.doc,
+          1,
+          'module.index.missing',
+          `模块文件 ${file.code} 没有出现在 ${DOCS_DIR}/design/modules.md 中。`,
+        ),
+      )
+    }
+    for (const submodule of file.submodules) {
+      if (!moduleFiles.has(submodule.code)) {
+        diagnostics.push(
+          diagnostic(
+            submodule.doc,
+            submodule.line,
+            'module.submodule.missing',
+            `子模块 ${submodule.code} 没有对应的 ${DOCS_DIR}/design/module-${submodule.code}.md。`,
+          ),
+        )
+      }
+    }
+  }
+
+  const issueFiles = new Map(
+    issues.all.filter((entry) => entry.code !== null).map((entry) => [entry.code, entry]),
+  )
+  const openCodes = new Set(issues.open.map((entry) => entry.code))
+  for (const entry of issues.open) {
+    const detail = issueFiles.get(entry.code)
+    if (detail === undefined) {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'issue.file.missing',
+          `进度索引引用了 ${entry.code}，但 ${DOCS_DIR}/issues/all/issue-${entry.code}.md 不存在。`,
+        ),
+      )
+    } else if (detail.status === '关闭') {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'issue.status.mismatch',
+          `${entry.code} 的状态是 关闭，却出现在 ${DOCS_DIR}/${ISSUE_OPEN}；关闭的问题只保留在 close.md。`,
+        ),
+      )
+    }
+  }
+  for (const entry of issues.close) {
+    const detail = issueFiles.get(entry.code)
+    if (detail === undefined) {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'issue.file.missing',
+          `关闭索引引用了 ${entry.code}，但 ${DOCS_DIR}/issues/all/issue-${entry.code}.md 不存在。`,
+        ),
+      )
+    } else if (detail.status === '开启') {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'issue.status.mismatch',
+          `${entry.code} 的状态是 开启，却出现在 ${DOCS_DIR}/${ISSUE_CLOSE}；开启的问题只保留在 open.md。`,
+        ),
+      )
+    }
+    if (openCodes.has(entry.code)) {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'issue.status.conflict',
+          `${entry.code} 同时出现在 ${DOCS_DIR}/${ISSUE_OPEN} 与 ${DOCS_DIR}/${ISSUE_CLOSE}；一个问题只能有一个状态。`,
         ),
       )
     }
@@ -979,10 +914,16 @@ export async function inspectDocs({ root }) {
     expected: EXPECTED_DOCS.length,
     found: EXPECTED_DOCS.length - missing.length,
     illegal: illegal.length,
+    optional: documents.filter((document) => document.status === 'optional').length,
     missing: missing.length,
     diagnostics: diagnostics.length,
     codes: diagnoses.length,
     plans: plans.length,
+    modules: modules.length,
+    moduleFiles: moduleDocs.length,
+    issues: issues.all.length,
+    openIssues: issues.open.length,
+    closedIssues: issues.close.length,
     locked: lock !== null,
   }
   const ok = illegal.length === 0 && missing.length === 0 && diagnostics.length === 0
@@ -998,6 +939,9 @@ export async function inspectDocs({ root }) {
     diagnostics,
     diagnoses,
     plans,
+    modules,
+    moduleDocs,
+    issues,
     lock,
     summary,
   }

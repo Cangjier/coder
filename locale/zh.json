@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Coder",
-    "description": "检查项目的 .coder/ 设计、诊断与计划文档：list 报告缺失、非法、格式问题、诊断码作用范围和计划编码，并校验锁 hash；lock/unlock 管理锁，update 按流程替换 .coder 下任意文件，render 渲染成带 Mermaid 图的 design.html 页面。"
+    "description": "检查项目的 .coder/ 设计、诊断、计划、模块、成员与问题文档：list 报告缺失、非法、格式问题、诊断码作用范围、计划编码、模块索引、成员名册和问题索引，并校验锁 hash；lock/unlock 管理锁，update 按流程替换 .coder 下任意文件，create_issue 登记实施过程中发现的问题，render 渲染成带 Mermaid 图的 design.html 页面。"
   }
 }

@@ -51,6 +51,62 @@ flowchart TD
   F -- 否 --> H[写入 plans]
 ```
 
+## 检查模块文档
+list 解析 modules.md 和存在的 module-NNNN.md，校验模块编码、架构/流程/数据结构分段、子模块引用，以及索引与详情文件是否成对。
+
+```mermaid
+flowchart TD
+  A[读取 modules.md] --> B[解析 # 0001]
+  B --> C[读取存在的 module-NNNN.md]
+  C --> D[校验架构/流程/数据结构分段]
+  D --> E[校验子模块引用]
+  E --> F{索引与详情成对?}
+  F -- 否 --> G[报 module.file.missing / module.index.missing]
+  F -- 是 --> H[写入 modules / moduleDocs]
+```
+
+## 检查问题文档
+问题文档都是可选的；存在时校验详情段落、状态、进度行、关闭原因，以及索引与详情文件是否对应、open 与 close 是否冲突。
+
+```mermaid
+flowchart TD
+  A[读取 issues/] --> B{文件存在?}
+  B -- 否 --> C[跳过]
+  B -- 是 --> D[解析详情与索引]
+  D --> E[校验段落、状态、进度与关闭原因]
+  E --> F[检查索引编码与详情文件]
+  F --> G[写入 issues]
+```
+
+## 检查成员文档
+成员文档都是可选的；存在时解析 members/all.md 的主对话与成员字段，members/flow.md 沿用场景和 Mermaid 规则。
+
+```mermaid
+flowchart TD
+  A[读取 members/] --> B{all.md 存在?}
+  B -- 是 --> C[解析 # 主对话 / # 成员N]
+  C --> D[校验字段、顺序与成员编号]
+  B -- 否 --> E[跳过 all.md]
+  D --> F{flow.md 存在?}
+  E --> F
+  F -- 是 --> G[按场景 + Mermaid 检查]
+  F -- 否 --> H[跳过 flow.md]
+```
+
+## 创建问题
+create_issue 取已用最大编码加一，生成详情并登记到 open.md 或 close.md；上锁时拒绝写入。
+
+```mermaid
+flowchart TD
+  A[create_issue 调用] --> B{已上锁?}
+  B -- 是 --> C[拒绝]
+  B -- 否 --> D[收集已用编码]
+  D --> E[生成详情并自检]
+  E --> F[写详情]
+  F --> G[追加索引]
+  G --> H[返回编码]
+```
+
 ## 加载插件
 ```mermaid
 flowchart TD
@@ -58,6 +114,7 @@ flowchart TD
   B --> C[注册 list / render]
   B --> D[注册 lock / unlock]
   B --> E[注册 update]
+  B --> F[注册 create_issue]
 ```
 ## 检查数据结构
 按 `##` 分段检查 data_structure.md 的 ts 围栏和 interface 声明。
@@ -102,12 +159,13 @@ flowchart TD
   G -- 调整 --> I[checkpoint + 按 branch 新建分支 + 提交]
 ```
 ## 渲染文档
-把十份预期文档渲染成一个 HTML 页面。
+把十一份预期文档、存在的模块详情和存在的成员文档渲染成一个 HTML 页面。
 
 ```mermaid
 flowchart LR
   A[render 调用] --> B[读取 .coder/design、diagnosis 与 plan]
-  B --> C[汇总诊断]
-  C --> D[生成 HTML]
-  D --> E[写入 dist/.coder]
+  B --> C[读取存在的模块详情与成员文档]
+  C --> D[汇总诊断]
+  D --> E[生成 HTML]
+  E --> F[写入 dist/.coder]
 ```

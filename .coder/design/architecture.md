@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到五个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目由 list 校验字段与归档状态，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划、模块、问题与成员文档由 list 校验格式和交叉引用，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -14,6 +14,7 @@ flowchart TB
     lock["lock 工具"]
     unlock["unlock 工具"]
     update["update 工具"]
+    issue["create_issue 工具"]
   end
   subgraph 扫描层
     walk["目录遍历"]
@@ -27,6 +28,9 @@ flowchart TB
     data["data_structure.md 校验"]
     diag["诊断码校验"]
     plan["计划文档校验"]
+    module["模块文档校验"]
+    issueDoc["问题文档校验"]
+    memberDoc["成员文档校验"]
     scope["作用范围命中"]
     lockHash["lock.md hash 校验"]
     report["报告汇总"]
@@ -99,6 +103,35 @@ flowchart LR
   F -- 否 --> H[写入 plans]
 ```
 
+## 局部视角：模块与问题
+只回答「模块和问题文档如何被校验」：模块按索引与详情成对检查，问题按详情段落、索引编码与状态冲突检查。
+
+```mermaid
+flowchart LR
+  A[读取 modules.md / module-NNNN.md] --> B[校验模块编码与分段]
+  B --> C{索引与详情成对?}
+  C -- 否 --> D[报 module.* 诊断]
+  C -- 是 --> E[记录 modules / moduleDocs]
+  F[读取 issues/] --> G[校验详情、进度与关闭原因]
+  G --> H{编码冲突或详情缺失?}
+  H -- 是 --> I[报 issue.* 诊断]
+  H -- 否 --> J[记录 issues]
+```
+
+## 局部视角：成员文档
+只回答「成员名册和成员流程如何被校验」：名册按主对话与成员分节检查字段，流程按场景和 Mermaid 图检查。
+
+```mermaid
+flowchart LR
+  A[读取 members/all.md] --> B[解析 # 主对话 / # 成员N]
+  B --> C[校验字段、顺序与成员编号]
+  D[读取 members/flow.md] --> E[按场景 + Mermaid 检查]
+  C --> F{格式有效?}
+  E --> F
+  F -- 否 --> G[报 members.* / flow.* 诊断]
+  F -- 是 --> H[列为可选文档]
+```
+
 ## 局部视角：数据结构
 只回答「data_structure.md 如何被校验」：按 `##` 分段，每段读取 ts 围栏，提取 interface 名称并查重。
 
@@ -132,8 +165,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取十份预期文档]
-  B --> C[汇总诊断]
-  C --> D[生成 HTML]
-  D --> E[写入 dist/.coder/design.html]
+  A[render 调用] --> B[读取十一份预期文档]
+  B --> C[读取存在的模块详情]
+  C --> D[汇总诊断]
+  D --> E[生成 HTML]
+  E --> F[写入 dist/.coder/design.html]
 ```

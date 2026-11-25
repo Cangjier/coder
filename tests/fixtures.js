@@ -61,3 +61,6 @@ export const PLAN_GOAL_ARCHIVED = `# G0002
 
 1. T0002
 `
+
+/** 空的模块索引：表示项目还没有拆分模块，是合法状态。 */
+export const MODULES_EMPTY = ''

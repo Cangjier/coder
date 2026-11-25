@@ -11,7 +11,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { inspectDocs, validateDocument } from '../src/docs.js'
 import { inspectPlan, validatePlan } from '../src/plan.js'
-import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
+import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const TODO = PLAN_TODO
 const GOAL = PLAN_GOAL
@@ -112,6 +112,7 @@ function writeProject(overrides = {}) {
     '.coder/design/architecture.md': ARCHITECTURE_OK,
     '.coder/design/flow.md': FLOW_OK,
     '.coder/design/data_structure.md': DATA_OK,
+    '.coder/design/modules.md': MODULES_EMPTY,
     '.coder/diagnosis/error.md': ERROR_OK,
     '.coder/diagnosis/warn.md': WARN_OK,
     '.coder/plan/todo.md': PLAN_TODO,
@@ -245,7 +246,7 @@ describe('list 与计划文档', () => {
   it('完整文档树解析四份计划并输出计划汇总', async () => {
     const report = await inspectDocs({ root: writeProject() })
     assert.equal(report.ok, true)
-    assert.equal(report.summary.expected, 10)
+    assert.equal(report.summary.expected, 11)
     assert.equal(report.summary.plans, 4)
     assert.equal(report.plans.length, 4)
     assert.match(report.text, /计划：/)

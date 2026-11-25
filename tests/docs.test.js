@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 
 import { DOCS_DIR, EXPECTED_DOCS, fileCoverage, inspectDocs, validateDocument } from '../src/docs.js'
-import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
+import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const FILE_OK = `# src
 源代码目录
@@ -120,6 +120,7 @@ function writeValidTree() {
     '.coder/design/architecture.md': ARCHITECTURE_OK,
     '.coder/design/flow.md': FLOW_OK,
     '.coder/design/data_structure.md': DATA_OK,
+    '.coder/design/modules.md': MODULES_EMPTY,
     '.coder/diagnosis/error.md': ERROR_OK,
     '.coder/diagnosis/warn.md': WARN_OK,
     '.coder/plan/todo.md': PLAN_TODO,
@@ -151,8 +152,8 @@ describe('inspectDocs', () => {
     assert.deepEqual(report.illegal, [])
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.diagnostics, [])
-    assert.equal(report.summary.expected, 10)
-    assert.equal(report.summary.found, 10)
+    assert.equal(report.summary.expected, 11)
+    assert.equal(report.summary.found, 11)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 
@@ -163,6 +164,7 @@ describe('inspectDocs', () => {
         '.coder/design/architecture.md': ARCHITECTURE_OK,
         '.coder/design/flow.md': FLOW_OK,
         '.coder/design/data_structure.md': DATA_OK,
+        '.coder/design/modules.md': MODULES_EMPTY,
         '.coder/diagnosis/error.md': ERROR_OK,
         '.coder/diagnosis/warn.md': WARN_OK,
         '.coder/plan/todo.md': PLAN_TODO,
@@ -186,6 +188,7 @@ describe('inspectDocs', () => {
       '.coder/design/file.md': FILE_OK,
       '.coder/design/architecture.md': ARCHITECTURE_OK,
       '.coder/design/data_structure.md': DATA_OK,
+      '.coder/design/modules.md': MODULES_EMPTY,
       '.coder/diagnosis/error.md': ERROR_OK,
       '.coder/diagnosis/warn.md': WARN_OK,
       '.coder/plan/todo.md': PLAN_TODO,
@@ -206,6 +209,7 @@ describe('inspectDocs', () => {
       '.coder/design/architecture.md': ARCHITECTURE_OK,
       '.coder/design/flow.md': FLOW_OK,
       '.coder/design/data_structure.md': DATA_OK,
+      '.coder/design/modules.md': MODULES_EMPTY,
       '.coder/diagnosis/error.md': '',
       '.coder/diagnosis/warn.md': '',
       '.coder/plan/todo.md': PLAN_TODO,
@@ -217,7 +221,7 @@ describe('inspectDocs', () => {
     assert.equal(report.ok, true)
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.diagnostics, [])
-    assert.equal(report.summary.found, 10)
+    assert.equal(report.summary.found, 11)
     assert.equal(report.summary.codes, 0)
   })
 
@@ -225,7 +229,7 @@ describe('inspectDocs', () => {
     const root = mkdtempSync(join(tempRoot, 'empty-'))
     const report = await inspect(root)
     assert.equal(report.docsRootExists, false)
-    assert.equal(report.missing.length, 10)
+    assert.equal(report.missing.length, 11)
     assert.equal(report.ok, false)
     assert.match(report.text, /不存在/)
   })
@@ -243,6 +247,7 @@ describe('inspectDocs', () => {
       '.coder/design/architecture.md': ARCHITECTURE_OK,
       '.coder/design/flow.md': FLOW_OK,
       '.coder/design/data_structure.md': DATA_OK,
+      '.coder/design/modules.md': MODULES_EMPTY,
       '.coder/diagnosis/error.md': ERROR_OK,
       '.coder/diagnosis/warn.md': WARN_OK,
       '.coder/plan/todo.md': PLAN_TODO,
@@ -628,6 +633,7 @@ describe('fixed document set', () => {
     'design/architecture.md',
     'design/flow.md',
     'design/data_structure.md',
+    'design/modules.md',
     'diagnosis/error.md',
     'diagnosis/warn.md',
     'plan/todo.md',

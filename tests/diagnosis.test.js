@@ -11,7 +11,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { inspectDocs } from '../src/docs.js'
 import { inspectDiagnosis, scopeMatches } from '../src/diagnosis.js'
-import { PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
+import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
 const DOC = '.coder/diagnosis/error.md'
 
@@ -106,6 +106,7 @@ function writeProject(errorText, warnText, extra = {}) {
     '.coder/design/architecture.md': ARCHITECTURE_OK,
     '.coder/design/flow.md': FLOW_OK,
     '.coder/design/data_structure.md': DATA_OK,
+    '.coder/design/modules.md': MODULES_EMPTY,
     '.coder/diagnosis/error.md': errorText,
     '.coder/diagnosis/warn.md': warnText,
     '.coder/plan/todo.md': PLAN_TODO,
@@ -456,7 +457,7 @@ describe('list 与诊断文档', () => {
     })
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
-    assert.equal(report.summary.expected, 10)
+    assert.equal(report.summary.expected, 11)
     assert.equal(report.summary.codes, 2)
     assert.equal(report.diagnoses[0].method, '静态代码审查')
     assert.equal(report.diagnoses[0].steps.length, 2)

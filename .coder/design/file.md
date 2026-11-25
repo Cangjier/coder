@@ -1,5 +1,5 @@
 # index.js
-插件入口：导出 name、inject 与 apply，注册 `list`、`render`、`lock`、`unlock`、`update` 工具。
+插件入口：导出 name、inject 与 apply，注册 `list`、`render`、`lock`、`unlock`、`update`、`create_issue` 工具。
 # package.json
 包清单：声明 coder bundle、导出文件与测试脚本。
 # cordis.patch.yml
@@ -11,23 +11,31 @@ bundle 补丁：插入 id 为 coder 的 Host 插件行。
 # src
 源码目录。
 ## src/docs.js
-文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档，执行四份设计文档、两份诊断文档和四份计划文档的确定性检查，并汇总诊断码作用范围与计划条目。
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题与成员文档的确定性检查，并汇总条目与交叉引用。
 ## src/glob.js
 通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
 ## src/markdown.js
 Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
+## src/design.js
+设计文档结构检查：architecture.md、flow.md 与 data_structure.md 的视角、场景与 ts interface 规则，供模块详情复用。
 ## src/diagnosis.js
 诊断文档：解析 error.md / warn.md，校验诊断码、作用范围、诊断方式、步骤格式与编号，并检查文件通配命中。
 ## src/scope.js
 作用范围：全局与文件路径通配的合法性校验，以及通配命中。
 ## src/plan.js
 计划文档：解析 todo / goal 及归档文档，校验编码、字段顺序、编号、完成预期、当前进度与关联 ToDo。
+## src/module.js
+模块文档：解析 modules.md 与可选的 module-NNNN.md，校验模块编码、说明、架构/流程/数据结构分段与子模块引用。
+## src/issue.js
+问题文档：解析可选的 issue-NNNN.md、open.md 与 close.md，校验详情段落、状态、进度行、关闭原因与索引编码。
+## src/member.js
+成员文档：解析可选的 members/all.md 与 members/flow.md，校验主对话、成员编号、身份/工作范围/工作区名称字段，以及成员流程的场景与 Mermaid 图。
 ## src/lock.js
 锁文件：lock.md 的格式解析、.coder hash 计算与读写。
 ## src/git.js
 update 的 git 操作：提交指定文件、checkpoint 与新建分支。
 ## src/render.js
-HTML 渲染：把十份预期文档写成单页 design.html。
+HTML 渲染：把十一份预期文档、存在的模块详情和存在的成员文档写成单页 design.html。
 # src/tools
 工具定义目录。
 ## src/tools/list.js
@@ -40,16 +48,24 @@ HTML 渲染：把十份预期文档写成单页 design.html。
 所有工具共用的项目根目录解析。
 ## src/tools/update.js
 `update` 工具：校验 tmp 源与 .coder 目标、上锁时分两步、替换并更新 hash，按 decision 提交。
+## src/tools/create-issue.js
+`create_issue` 工具：按最大编码加一创建问题详情，并登记到 open.md 或 close.md。
 # tests
 测试目录。
 ## tests/docs.test.js
-覆盖扫描、缺失、非法、文件覆盖与十份文档的格式诊断。
+覆盖扫描、缺失、非法、文件覆盖与十一份文档的格式诊断。
 ## tests/diagnosis.test.js
 覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。
 ## tests/plan.test.js
 覆盖计划编码、字段、编号、完成预期、当前进度、关联 ToDo 与归档一致性。
+## tests/module.test.js
+覆盖模块索引、模块详情、子模块引用、索引交叉检查与渲染收录。
+## tests/issue.test.js
+覆盖问题详情、open/close 索引、交叉检查与 create_issue 的编号和写入规则。
+## tests/member.test.js
+覆盖成员名册的主对话、成员编号与字段，成员流程的场景与 Mermaid 图，以及 list/render 对成员文档的收录。
 ## tests/fixtures.js
-多份测试共用的计划文档合法样本。
+多份测试共用的合法文档样本。
 ## tests/glob.test.js
 覆盖 *、**、? 与 tmp/** 的匹配行为。
 ## tests/plugin.test.js

@@ -1,15 +1,16 @@
 /**
  * `coder`：给 coder 文档树一个确定性入口。
  *
- * 插件注册五个工具：
+ * 插件注册六个工具：
  *
  *   list    扫描项目根目录下的 `.coder/` 文档树，罗列全部文档，标出非法和
  *           缺失的预期文档，并按 `docs/design.md` 的格式约定逐份诊断；
  *           诊断码的作用范围、步骤格式与文件通配会被检查，计划条目的字段、
- *           编号与归档状态会被检查，上锁时还会校验 lock.md 的 hash。
+ *           编号与归档状态会被检查，模块索引与问题索引会和详情文件交叉检查，
+ *           成员名册的字段和成员流程的场景会被检查；上锁时还会校验 lock.md 的 hash。
  *
- *   render  把 `.coder/` 的设计、诊断与计划文档渲染成一个 `design.html`，默认写到
- *           `dist/.coder/design.html`；页面内嵌文档正文。
+ *   render  把 `.coder/` 的设计、诊断与计划文档、存在的模块详情和成员文档渲染成
+ *           一个 `design.html`，默认写到 `dist/.coder/design.html`；页面内嵌文档正文。
  *
  *   lock    写入 `.coder/lock.md`，记录当前 hash 与用户授权原文。
  *
@@ -18,6 +19,9 @@
  *   update  用 `tmp/` 下的源文件替换 `.coder` 下的任意文档；上锁时分两步，
  *           要求子代理审查后带 key、decision、review 再次调用。
  *
+ *   create_issue  在 `.coder/issues/all/` 下新建问题详情，并登记到 open.md 或
+ *                 close.md；`.coder` 上锁时拒绝直接写入。
+ *
  * 文档目录、预期文档和格式规则都是固化的，插件不接受配置。
  * 本包是纯 ESM、零运行时依赖：不 import 任何 `@deepseek-ai/*` 或第三方包，
  * 只使用 Node 内置模块。
@@ -25,6 +29,7 @@
  * @module coder
  */
 
+import { createCreateIssueTool } from './src/tools/create-issue.js'
 import { createListTool } from './src/tools/list.js'
 import { createLockTool, createUnlockTool } from './src/tools/lock.js'
 import { createRenderTool } from './src/tools/render.js'
@@ -54,6 +59,7 @@ export function apply(ctx) {
         createLockTool(ctx.logger),
         createUnlockTool(ctx.logger),
         createUpdateTool(ctx.logger),
+        createCreateIssueTool(ctx.logger),
       ]
       for (const definition of definitions) {
         try {
