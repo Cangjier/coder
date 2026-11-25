@@ -35,10 +35,12 @@ flowchart LR
 ```
 
 ## 身份与范围
-主对话用 set_member_scope 设置成员的身份和工作范围，并把同一组值记录到 members/all.md。
+主对话用 set_member_scope 设置成员的身份和工作范围，并把同一组值记录到 members/all.md；部署方式、SSH 用户等补充信息写成可选的备注。
 ```mermaid
 flowchart LR
   A[确定分工] --> B[set_member_scope]
   B --> C[成员会话]
   C --> D[写入 members/all.md]
+  C --> E[补充可选备注]
+  E --> D
 ```

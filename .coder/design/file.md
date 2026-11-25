@@ -29,7 +29,7 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/issue.js
 问题文档：解析可选的 issue-NNNN.md、open.md 与 close.md，校验详情段落、状态、进度行、关闭原因与索引编码。
 ## src/member.js
-成员文档：解析可选的 members/all.md 与 members/flow.md，校验主对话、成员编号、身份/工作范围/工作区名称字段，以及成员流程的场景与 Mermaid 图。
+成员文档：解析可选的 members/all.md 与 members/flow.md，校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
 ## src/lock.js
 锁文件：lock.md 的格式解析、.coder hash 计算与读写。
 ## src/git.js
@@ -63,7 +63,7 @@ HTML 渲染：把十一份预期文档、存在的模块详情和存在的成员
 ## tests/issue.test.js
 覆盖问题详情、open/close 索引、交叉检查与 create_issue 的编号和写入规则。
 ## tests/member.test.js
-覆盖成员名册的主对话、成员编号与字段，成员流程的场景与 Mermaid 图，以及 list/render 对成员文档的收录。
+覆盖成员名册的主对话、成员编号、字段与可选备注，成员流程的场景与 Mermaid 图，以及 list/render 对成员文档的收录。
 ## tests/fixtures.js
 多份测试共用的合法文档样本。
 ## tests/glob.test.js

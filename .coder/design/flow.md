@@ -79,13 +79,13 @@ flowchart TD
 ```
 
 ## 检查成员文档
-成员文档都是可选的；存在时解析 members/all.md 的主对话与成员字段，members/flow.md 沿用场景和 Mermaid 规则。
+成员文档都是可选的；存在时解析 members/all.md 的主对话与成员字段（成员的备注可选），members/flow.md 沿用场景和 Mermaid 规则。
 
 ```mermaid
 flowchart TD
   A[读取 members/] --> B{all.md 存在?}
   B -- 是 --> C[解析 # 主对话 / # 成员N]
-  C --> D[校验字段、顺序与成员编号]
+  C --> D[校验字段、顺序、备注与成员编号]
   B -- 否 --> E[跳过 all.md]
   D --> F{flow.md 存在?}
   E --> F

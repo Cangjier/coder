@@ -11,10 +11,12 @@
  *   工作区名称：coder
  *   身份：验证
  *   工作范围：部署后的只读验证
+ *   备注：Linux 成员
  *
  * `# 主对话` 必须存在且是第一个一级标题；其余一级标题写成 `# 成员N`，
  * N 是正整数，同一份文档里不能重复。成员可以为零：只有 `# 主对话` 也是
  * 合法状态。字段按固定顺序出现，值不能为空；一节的正文只放字段行，不写其他内容。
+ * 成员的 `备注` 可选，出现时必须写在最后；主对话不接受 `备注`。
  *
  * 成员流程 `flow.md` 沿用 `design/flow.md` 的规则：用 `## <场景>` 分段，
  * 每个场景至少一段非空说明和一张非空的 `mermaid` 图。
@@ -40,13 +42,16 @@ const MAIN_HEADING = '主对话'
 const MEMBER_HEADING = /^成员([1-9]\d*)$/
 
 /** 字段行：`字段：值`，全角或半角冒号都接受。 */
-const FIELD_PATTERN = /^(工作区名称|身份|工作范围)\s*[：:]\s*(.*?)\s*$/
+const FIELD_PATTERN = /^(工作区名称|身份|工作范围|备注)\s*[：:]\s*(.*?)\s*$/
 
 /** 主对话允许且必填的字段，按固定顺序。 */
 const MAIN_FIELDS = Object.freeze(['身份', '工作范围'])
 
-/** 成员允许且必填的字段，按固定顺序。 */
-const MEMBER_FIELDS = Object.freeze(['工作区名称', '身份', '工作范围'])
+/** 成员允许的字段，按固定顺序；`备注` 可选，出现时必须在最后。 */
+const MEMBER_FIELDS = Object.freeze(['工作区名称', '身份', '工作范围', '备注'])
+
+/** 成员必填的字段；`备注` 不在其中。 */
+const MEMBER_REQUIRED_FIELDS = Object.freeze(['工作区名称', '身份', '工作范围'])
 
 /**
  * 构造一条诊断。
@@ -126,11 +131,12 @@ function preambleDiagnostics(doc, analysis) {
  * @param {ReturnType<typeof analyzeMarkdown>} analysis - 整份文档的解析结果。
  * @param {{line: number}} heading - 当前一级标题。
  * @param {number} index - 当前标题在全部标题里的下标。
- * @param {readonly string[]} allowedFields - 这一节允许且必填的字段，按顺序。
+ * @param {readonly string[]} allowedFields - 这一节允许的字段，按顺序。
  * @param {string} label - 给人看的节名。
+ * @param {readonly string[]} [requiredFields] - 必填字段，默认与 allowedFields 相同。
  * @returns {{diagnostics: object[], fields: Record<string, string>}} 诊断与字段值。
  */
-function parseSection(doc, analysis, heading, index, allowedFields, label) {
+function parseSection(doc, analysis, heading, index, allowedFields, label, requiredFields = allowedFields) {
   const diagnostics = []
   const fields = {}
   const seen = new Map()
@@ -185,7 +191,7 @@ function parseSection(doc, analysis, heading, index, allowedFields, label) {
     fields[field] = value
   }
 
-  for (const field of allowedFields) {
+  for (const field of requiredFields) {
     if (!seen.has(field)) {
       diagnostics.push(diagnostic(doc, heading.line, 'members.field.missing', `${label} 缺少字段：${field}。`))
     }
@@ -271,7 +277,15 @@ export function inspectMembersAll(doc, text) {
         continue
       }
       usedNumbers.add(number)
-      const parsed = parseSection(doc, analysis, heading, index, MEMBER_FIELDS, `成员${number}`)
+      const parsed = parseSection(
+        doc,
+        analysis,
+        heading,
+        index,
+        MEMBER_FIELDS,
+        `成员${number}`,
+        MEMBER_REQUIRED_FIELDS,
+      )
       diagnostics.push(...parsed.diagnostics)
       members.push({
         doc,
@@ -280,6 +294,7 @@ export function inspectMembersAll(doc, text) {
         workspace: parsed.fields['工作区名称'] ?? null,
         identity: parsed.fields['身份'] ?? null,
         scope: parsed.fields['工作范围'] ?? null,
+        note: parsed.fields['备注'] ?? null,
       })
       continue
     }

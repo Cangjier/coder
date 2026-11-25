@@ -260,17 +260,19 @@ console.log({ recorded, current })
 工作区名称：coder
 身份：验证
 工作范围：部署后的只读验证
+备注：Linux 成员，SSH 用户 root
 ```
 
 - `# 主对话` 必须存在，且是第一个一级标题；只能出现一次。
 - 其余一级标题写成 `# 成员N`，N 是正整数（从 1 开始，不接受前导零），同一份文档里成员编号不能重复。
 - 成员可以为零：只有 `# 主对话`、没有任何 `# 成员N` 也是合法状态。
 - `# 主对话` 必填 `身份` 和 `工作范围`；`# 成员N` 必填 `工作区名称`、`身份` 和 `工作范围`。
+- `# 成员N` 还可以写一个可选的 `备注`，用来记录部署方式、SSH 用户等补充信息；出现时必须写在 `工作范围` 之后。`# 主对话` 不接受 `备注`。
 - 字段写在节的正文里，每行一个 `字段：值`；顺序固定，值不能为空，同一节里的字段不能重复。
 - 一节的正文只放这些字段行；空行可以忽略，其他正文行报错。
 - 第一个一级标题之前不能有正文。
 
-成员流程 `flow.md` 沿用 `design/flow.md` 的规则：用 `## <场景>` 分段，每个场景至少一段说明和一张非空的 `mermaid` 图。它讲解主对话如何分派任务、等待成员、部署验证，以及如何维护成员身份与工作范围。
+成员流程 `flow.md` 沿用 `design/flow.md` 的规则：用 `## <场景>` 分段，每个场景至少一段说明和一张非空的 `mermaid` 图。它讲解主对话如何分派任务、等待成员、部署验证，以及如何维护成员身份、工作范围与备注。
 
 ## lock.md
 
@@ -286,7 +288,7 @@ console.log({ recorded, current })
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md` 和 `members/flow.md` 是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md` 会检查编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文档会检查详情段落、状态、进度行、关闭原因、编码唯一性，以及 open.md 与 close.md 是否冲突、索引是否指向存在的详情文件。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段，以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md` 和 `members/flow.md` 是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md` 会检查编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文档会检查详情段落、状态、进度行、关闭原因、编码唯一性，以及 open.md 与 close.md 是否冲突、索引是否指向存在的详情文件。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
 ### 预期文档
 
@@ -409,7 +411,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - 两个文件都是可选的；文件不存在时不报缺失，存在时按下面的规则检查。
 - `all.md` 只用一级标题分节；`# 主对话` 必须存在、只能出现一次，而且是第一个一级标题，否则报 `members.main.missing`、`members.main.duplicate` 或 `members.main.order`。
 - 其余一级标题必须是 `# 成员N`，N 是正整数且不接受前导零；编号重复报 `members.member.duplicate`，写成 `# 成员` 等非法形式报 `members.member.format`，其他标题报 `members.section.unknown`。
-- `# 主对话` 必填 `身份`、`工作范围`；`# 成员N` 必填 `工作区名称`、`身份`、`工作范围`。字段顺序固定，值不能为空；缺字段、空值、重复字段、顺序错误或出现不支持的字段分别报 `members.field.missing`、`members.field.empty`、`members.field.duplicate`、`members.field.order`、`members.field.unexpected`。
+- `# 主对话` 必填 `身份`、`工作范围`；`# 成员N` 必填 `工作区名称`、`身份`、`工作范围`，可选 `备注`。`备注` 只用于成员，出现时必须写在最后；主对话写 `备注` 报 `members.field.unexpected`。字段顺序固定，值不能为空；缺字段、空值、重复字段、顺序错误或出现不支持的字段分别报 `members.field.missing`、`members.field.empty`、`members.field.duplicate`、`members.field.order`、`members.field.unexpected`。
 - 每节正文每行一个 `字段：值`，空行忽略；其他正文行报 `members.body`。`##` 及其他标题级别报 `members.heading.level`。
 - 第一个一级标题之前不能有正文，否则报 `members.preamble`。
 - `flow.md` 按 `design/flow.md` 的规则检查：每个 `## <场景>` 至少一段说明和一张非空的 `mermaid` 图；缺少场景、场景为空、缺少图或图为空分别报 `flow.no-scenario`、`flow.scenario.empty`、`flow.scenario.no-diagram`、`flow.diagram.empty`。

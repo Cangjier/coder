@@ -68,6 +68,7 @@ const MEMBERS_ALL_OK = `# 主对话
 工作区名称：coder
 身份：验证
 工作范围：部署后的只读验证
+备注：Linux 成员，SSH 用户 root
 
 # 成员2
 工作区名称：coder
@@ -137,10 +138,10 @@ describe('members/all.md', () => {
     assert.equal(result.main.identity, '开发')
     assert.equal(result.main.scope, '插件设计与实现')
     assert.deepEqual(
-      result.members.map((entry) => [entry.number, entry.workspace, entry.identity, entry.scope]),
+      result.members.map((entry) => [entry.number, entry.workspace, entry.identity, entry.scope, entry.note]),
       [
-        [1, 'coder', '验证', '部署后的只读验证'],
-        [2, 'coder', '验证', 'Windows 成员的只读验证'],
+        [1, 'coder', '验证', '部署后的只读验证', 'Linux 成员，SSH 用户 root'],
+        [2, 'coder', '验证', 'Windows 成员的只读验证', null],
       ],
     )
   })
@@ -255,9 +256,51 @@ describe('members/all.md', () => {
     const body = `# 主对话
 身份：开发
 工作范围：实现
-备注：无
+补充：无
 `
     assert.ok(rules(inspectMembersAll('x.md', body).diagnostics, 'members.body').length === 1)
+  })
+
+  it('成员备注可选、写在最后，空值或重复仍会报错', () => {
+    const withNote = `# 主对话
+身份：开发
+工作范围：实现
+# 成员1
+工作区名称：coder
+身份：验证
+工作范围：验证
+备注：Linux 成员
+`
+    const result = inspectMembersAll('x.md', withNote)
+    assert.deepEqual(result.diagnostics, [])
+    assert.equal(result.members[0].note, 'Linux 成员')
+
+    const withoutNote = withNote.replace('备注：Linux 成员\n', '')
+    assert.deepEqual(inspectMembersAll('x.md', withoutNote).diagnostics, [])
+
+    const empty = withNote.replace('备注：Linux 成员', '备注：')
+    assert.ok(rules(inspectMembersAll('x.md', empty).diagnostics, 'members.field.empty').length === 1)
+
+    const duplicate = withNote.replace('备注：Linux 成员', '备注：Linux 成员\n备注：Windows 成员')
+    assert.ok(rules(inspectMembersAll('x.md', duplicate).diagnostics, 'members.field.duplicate').length === 1)
+
+    const order = `# 主对话
+身份：开发
+工作范围：实现
+# 成员1
+工作区名称：coder
+身份：验证
+备注：提前
+工作范围：验证
+`
+    assert.ok(rules(inspectMembersAll('x.md', order).diagnostics, 'members.field.order').length === 1)
+
+    const mainNote = `# 主对话
+身份：开发
+工作范围：实现
+备注：主对话没有备注
+`
+    assert.ok(rules(inspectMembersAll('x.md', mainNote).diagnostics, 'members.field.unexpected').length === 1)
   })
 
   it('前导正文、二级标题和未闭合围栏都会被诊断', () => {
@@ -395,6 +438,7 @@ describe('render members', () => {
     assert.match(html, /\.coder\/members\/all\.md/)
     assert.match(html, /\.coder\/members\/flow\.md/)
     assert.match(html, /身份：开发/)
+    assert.match(html, /备注：Linux 成员，SSH 用户 root/)
     assert.match(html, /成员流程/)
     assert.match(html, /href="#members-all"/)
     assert.match(html, /href="#members-flow"/)
