@@ -31,7 +31,7 @@ flowchart TB
 ```
 # 流程
 ## 创建问题
-create_issue 先在内存里生成固定段落并自检，再写详情和索引；上锁时直接拒绝。
+create_issue 先在内存里生成固定段落并自检，再按状态写 open/ 或 close/ 下的问题文件；上锁时直接拒绝。
 ```mermaid
 flowchart TD
   A[create_issue 调用] --> B{已上锁?}
@@ -39,7 +39,7 @@ flowchart TD
   B -- 否 --> D[取最大编码加一]
   D --> E[生成详情并自检]
   E --> F[写 issue-NNNN.md]
-  F --> G[追加 open.md / close.md]
+  F --> G[写 open/ 或 close/ 下的问题文件]
   G --> H[返回编码与路径]
 ```
 ## 渲染页面

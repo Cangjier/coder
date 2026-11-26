@@ -65,17 +65,18 @@ flowchart TD
   F -- 是 --> H[写入 modules / moduleDocs]
 ```
 
-## 检查问题文档
-问题文档都是可选的；存在时校验详情段落、状态、进度行、关闭原因，以及索引与详情文件是否对应、open 与 close 是否冲突。
+## 检查问题文件
+问题文件都是可选的；存在时按所在文件夹校验状态、段落顺序、当前进度与关闭原因，并检查同一编码是否同时出现在 open/ 与 close/。
 
 ```mermaid
 flowchart TD
-  A[读取 issues/] --> B{文件存在?}
+  A[读取 issues/open 与 issues/close] --> B{文件存在?}
   B -- 否 --> C[跳过]
-  B -- 是 --> D[解析详情与索引]
-  D --> E[校验段落、状态、进度与关闭原因]
-  E --> F[检查索引编码与详情文件]
-  F --> G[写入 issues]
+  B -- 是 --> D[按文件夹确定状态]
+  D --> E[校验段落、当前进度与关闭原因]
+  E --> F{同一编码同时在两边?}
+  F -- 是 --> G[报 issue.status.conflict]
+  F -- 否 --> H[写入 issues]
 ```
 
 ## 检查成员文档
@@ -94,7 +95,7 @@ flowchart TD
 ```
 
 ## 创建问题
-create_issue 取已用最大编码加一，生成详情并登记到 open.md 或 close.md；上锁时拒绝写入。
+create_issue 取两个问题文件夹里的最大编码加一，按状态写入 open/ 或 close/ 下的问题文件；上锁时拒绝写入。
 
 ```mermaid
 flowchart TD
@@ -102,9 +103,8 @@ flowchart TD
   B -- 是 --> C[拒绝]
   B -- 否 --> D[收集已用编码]
   D --> E[生成详情并自检]
-  E --> F[写详情]
-  F --> G[追加索引]
-  G --> H[返回编码]
+  E --> F[写 open/ 或 close/ 下的问题文件]
+  F --> H[返回编码]
 ```
 
 ## 加载插件

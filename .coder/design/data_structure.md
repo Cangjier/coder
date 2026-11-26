@@ -135,38 +135,41 @@ export interface ModuleDoc {
 
 ## 问题条目
 
-`issue-NNNN.md` 是详情，`open.md` 与 `close.md` 是索引；三个文件都可选。
+问题文件放在 `issues/open/` 或 `issues/close/` 下，状态由文件夹决定；没有索引文件。
 
 ```ts
 export type IssueStatus = '开启' | '关闭'
 
-export interface IssueFile {
-  doc: string
-  path: string
-  relative: string
-  /** 从文件名取出的 4 位编码 */
-  code: string | null
-  /** 详情里的状态；格式无效时为 null */
-  status: IssueStatus | null
+export interface IssueProgress {
+  line: number
+  /** 进度通配；无效时为 null */
+  scope: string | null
+  /** 进度说明 */
+  text: string
+  /** 通配命中的项目文件数；未检查时为 null */
+  matches: number | null
 }
 
-export interface IssueIndexEntry {
+export interface IssueEntry {
+  /** 展示用文档路径，例如 .coder/issues/open/issue-0001.md */
   doc: string
+  /** 第一个段落的行号 */
   line: number
-  /** 0001 */
+  /** 文件名里的 4 位编码 */
   code: string
-  /** open.md 的进度通配；close.md 为 undefined */
-  scope?: string | null
-  /** open.md 的进度说明；close.md 为关闭原因 */
-  text?: string | null
-  /** 进度通配命中的项目文件数；未检查时为 null */
-  matches?: number | null
+  /** 所在文件夹决定的状态 */
+  status: IssueStatus
+  /** 开启问题的当前进度；关闭的问题为 null */
+  progress: IssueProgress | null
+  /** 关闭问题的关闭原因；开启的问题为 null */
+  reason: string | null
 }
 
 export interface IssueReport {
-  open: IssueIndexEntry[]
-  close: IssueIndexEntry[]
-  all: IssueFile[]
+  open: IssueEntry[]
+  close: IssueEntry[]
+  /** 两类问题的汇总，供 list 展示 */
+  all: { code: string, path: string, status: IssueStatus }[]
 }
 ```
 
@@ -188,7 +191,6 @@ export type DocumentKind =
   | 'plan-todo-archived'
   | 'plan-goal'
   | 'plan-goal-archived'
-  | 'issue-all'
   | 'issue-open'
   | 'issue-close'
   | 'members-all'
@@ -238,7 +240,7 @@ export interface Summary {
   modules: number
   /** 存在的模块详情数 */
   moduleFiles: number
-  /** 问题详情数 */
+  /** 问题文件数 */
   issues: number
   /** 进行中问题数 */
   openIssues: number
@@ -270,7 +272,7 @@ export interface Report {
   modules: ModuleEntry[]
   /** 存在的模块详情 */
   moduleDocs: ModuleDoc[]
-  /** 问题详情与索引 */
+  /** 问题文件 */
   issues: IssueReport
   summary: Summary
   /** 锁的状态；未上锁时为 null */

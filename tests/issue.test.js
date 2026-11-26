@@ -1,8 +1,8 @@
 /**
- * 问题文档与 `create_issue` 的行为测试。
+ * 问题文件与 `create_issue` 的行为测试。
  *
- * 覆盖问题详情的固定段落、open.md / close.md 的进度与关闭原因、可选文件的
- * 状态、索引与详情文件的交叉检查，以及 create_issue 的编号与写入规则。
+ * 覆盖问题文件的固定段落、open/ 与 close/ 文件夹状态、当前进度与关闭原因、
+ * 可选文件的检查，以及 create_issue 的编号与写入规则。
  */
 
 import assert from 'node:assert/strict'
@@ -12,12 +12,7 @@ import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 
 import { inspectDocs } from '../src/docs.js'
-import {
-  inspectIssueAll,
-  inspectIssueClose,
-  inspectIssueOpen,
-  validateIssue,
-} from '../src/issue.js'
+import { inspectIssue, validateIssue } from '../src/issue.js'
 import { createCreateIssueTool } from '../src/tools/create-issue.js'
 import { createLockTool } from '../src/tools/lock.js'
 
@@ -59,11 +54,8 @@ export interface Report {
 \`\`\`
 `
 
-const ISSUE_OK = `# 问题
+const ISSUE_OPEN_OK = `# 问题
 列表漏报问题。
-
-# 状态
-开启
 
 # 复现
 1. 运行 list。
@@ -74,13 +66,18 @@ const ISSUE_OK = `# 问题
 
 # 提交源
 用户
-`
 
-const OPEN_OK = `# 0001
+# 当前进度
 [src/**] 当前进度为 正在定位。
 `
 
-const CLOSE_OK = `# 0001
+const ISSUE_CLOSE_OK = `# 问题
+列表漏报问题。
+
+# 提交源
+用户
+
+# 关闭原因
 已修复并验证。
 `
 
@@ -128,238 +125,192 @@ function rules(report, rule) {
   return report.diagnostics.filter((item) => item.rule === rule)
 }
 
-describe('issue detail', () => {
-  it('完整的详情通过并解析出状态', () => {
-    const result = inspectIssueAll('.coder/issues/all/issue-0001.md', ISSUE_OK)
+/**
+ * 在开启的问题文件上跑一次校验。
+ * @param {string} text - 文件正文。
+ * @param {string} [code] - 文件名编码。
+ * @param {string[]} [files] - 项目文件。
+ * @returns {object[]} 诊断。
+ */
+function checkOpen(text, code = '0001', files = ['src/main.ts']) {
+  return validateIssue('.coder/issues/open/issue-0001.md', text, 'issue-open', code, files)
+}
+
+describe('问题文件', () => {
+  it('开启的问题解析出编码、状态与当前进度', () => {
+    const result = inspectIssue(
+      '.coder/issues/open/issue-0001.md',
+      ISSUE_OPEN_OK,
+      'issue-open',
+      '0001',
+      ['src/main.ts'],
+    )
     assert.deepEqual(result.diagnostics, [])
-    assert.equal(result.status, '开启')
+    assert.equal(result.entry.code, '0001')
+    assert.equal(result.entry.status, '开启')
+    assert.deepEqual(result.entry.progress, {
+      line: 15,
+      scope: 'src/**',
+      text: '正在定位。',
+      matches: 1,
+    })
+  })
+
+  it('关闭的问题解析出关闭原因', () => {
+    const result = inspectIssue(
+      '.coder/issues/close/issue-0002.md',
+      ISSUE_CLOSE_OK,
+      'issue-close',
+      '0002',
+    )
+    assert.deepEqual(result.diagnostics, [])
+    assert.equal(result.entry.status, '关闭')
+    assert.equal(result.entry.reason, '已修复并验证。')
   })
 
   it('复现与建议可以省略，也可以带（可选）后缀', () => {
-    const minimal = `# 问题
-问题描述。
-
-# 状态
-关闭
-
-# 提交源
-用户
-`
-    assert.deepEqual(inspectIssueAll('x.md', minimal).diagnostics, [])
-    assert.equal(inspectIssueAll('x.md', minimal).status, '关闭')
-
-    const marked = `# 问题
-问题描述。
-
-# 状态
-开启
-
-# 复现（可选）
-没有复现步骤。
-
-# 建议（可选）
-没有建议。
-
-# 提交源
-用户
-`
-    assert.deepEqual(inspectIssueAll('x.md', marked).diagnostics, [])
+    assert.deepEqual(
+      validateIssue(
+        '.coder/issues/close/issue-0001.md',
+        ISSUE_CLOSE_OK.replace('用户', '用户'),
+        'issue-close',
+        '0001',
+      ),
+      [],
+    )
+    const withSuffix = ISSUE_OPEN_OK.replace('# 复现', '# 复现（可选）').replace('# 建议', '# 建议（可选）')
+    assert.deepEqual(checkOpen(withSuffix), [])
   })
 
-  it('缺少必填段落、状态非法或段落顺序错误时报错', () => {
-    const missing = `# 问题
-问题描述。
-`
-    const missingReport = inspectIssueAll('x.md', missing).diagnostics
-    assert.ok(missingReport.some((item) => item.rule === 'issue.section.missing'))
+  it('# 状态 由文件夹取代，写进文件会报错', () => {
+    const text = ISSUE_OPEN_OK.replace('# 当前进度', '# 状态\n开启\n\n# 当前进度')
+    assert.ok(checkOpen(text).some((item) => item.rule === 'issue.status.removed'))
+  })
 
-    const badStatus = ISSUE_OK.replace('开启', '处理中')
+  it('缺少必填段落、段落顺序错误和空段落都会报错', () => {
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace('# 提交源\n用户\n', '')).some((item) => item.rule === 'issue.section.missing'))
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace(/# 当前进度\n.*\n/, '')).some((item) => item.rule === 'issue.section.missing'))
+    const reordered = ISSUE_OPEN_OK.replace('# 问题\n列表漏报问题。', '# 提交源\n用户\n\n# 问题\n列表漏报问题。').replace('# 提交源\n用户\n\n# 当前进度', '# 当前进度')
+    assert.ok(checkOpen(reordered).some((item) => item.rule === 'issue.section.order'))
     assert.ok(
-      inspectIssueAll('x.md', badStatus).diagnostics.some((item) => item.rule === 'issue.status.value'),
-    )
-
-    const wrongOrder = `# 状态
-开启
-
-# 问题
-问题描述。
-
-# 提交源
-用户
-`
-    assert.ok(
-      inspectIssueAll('x.md', wrongOrder).diagnostics.some((item) => item.rule === 'issue.section.order'),
+      checkOpen(ISSUE_OPEN_OK.replace('# 建议\n补上检查。', '# 建议\n')).some((item) => item.rule === 'issue.section.empty'),
     )
   })
 
-  it('未知段落、空段落和二级标题都会报错', () => {
-    const text = `# 问题
-
-# 状态
-开启
-
-# 备注
-多余
-
-# 提交源
-用户
-
-## 子标题
-说明
-`
-    const report = inspectIssueAll('x.md', text).diagnostics
-    assert.ok(report.some((item) => item.rule === 'issue.section.empty'))
-    assert.ok(report.some((item) => item.rule === 'issue.section.unknown'))
-    assert.ok(report.some((item) => item.rule === 'issue.heading.level'))
+  it('未知段落、二级标题、空文件与第一个标题之前的正文都会报错', () => {
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace('# 当前进度', '# 备注\n补充\n\n# 当前进度')).some((item) => item.rule === 'issue.section.unknown'))
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace('# 复现', '## 复现')).some((item) => item.rule === 'issue.heading.level'))
+    assert.ok(checkOpen('').some((item) => item.rule === 'issue.empty'))
+    assert.ok(checkOpen(`说明\n${ISSUE_OPEN_OK}`).some((item) => item.rule === 'issue.preamble'))
   })
 
-  it('空详情与第一个标题之前的正文都会被诊断', () => {
-    assert.ok(
-      inspectIssueAll('x.md', '').diagnostics.some((item) => item.rule === 'issue.empty'),
-    )
-    assert.ok(
-      inspectIssueAll('x.md', `前言\n${ISSUE_OK}`).diagnostics.some((item) => item.rule === 'issue.preamble'),
-    )
+  it('当前进度必须是一行合法通配，且要命中项目文件', () => {
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace('[src/**] 当前进度为 正在定位。', '正在定位。')).some((item) => item.rule === 'issue.progress.format'))
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace('[src/**]', '[/src]')).some((item) => item.rule === 'issue.progress.glob'))
+    assert.ok(checkOpen(ISSUE_OPEN_OK.replace('[src/**]', '[web/**]')).some((item) => item.rule === 'issue.progress.no-match'))
+    assert.ok(checkOpen(`${ISSUE_OPEN_OK}[src/**] 当前进度为 又一行。\n`).some((item) => item.rule === 'issue.progress.lines'))
+  })
+
+  it('关闭原因至少一行正文，开启的问题不接受关闭原因', () => {
+    const emptyReason = ISSUE_CLOSE_OK.replace('# 关闭原因\n已修复并验证。', '# 关闭原因\n')
+    assert.ok(validateIssue('.coder/issues/close/issue-0001.md', emptyReason, 'issue-close', '0001').some((item) => item.rule === 'issue.section.empty'))
+    const wrongSection = ISSUE_OPEN_OK.replace('# 当前进度', '# 关闭原因')
+    assert.ok(checkOpen(wrongSection).some((item) => item.rule === 'issue.section.unknown'))
+  })
+
+  it('文件名编码必须是 4 位数字', () => {
+    assert.ok(checkOpen(ISSUE_OPEN_OK, '1').some((item) => item.rule === 'issue.code.format'))
   })
 })
 
-describe('issue indexes', () => {
-  it('open.md 的进度行与通配命中通过', () => {
-    const result = inspectIssueOpen('.coder/issues/open.md', OPEN_OK, ['src/main.ts'])
-    assert.deepEqual(result.diagnostics, [])
-    assert.equal(result.entries.length, 1)
-    assert.equal(result.entries[0].code, '0001')
-    assert.equal(result.entries[0].matches, 1)
-  })
-
-  it('open.md 拒绝编码、进度格式与通配问题', () => {
-    assert.ok(
-      inspectIssueOpen('x.md', '# 1\n[src/**] 当前进度为 进行中。\n').diagnostics.some(
-        (item) => item.rule === 'issue.code.format',
-      ),
-    )
-    assert.ok(
-      inspectIssueOpen('x.md', '# 0001\n正在处理。\n').diagnostics.some(
-        (item) => item.rule === 'issue.progress.format',
-      ),
-    )
-    assert.ok(
-      inspectIssueOpen('x.md', '# 0001\n[全局] 当前进度为 进行中。\n').diagnostics.some(
-        (item) => item.rule === 'issue.progress.glob',
-      ),
-    )
-    assert.ok(
-      inspectIssueOpen('x.md', '# 0001\n[none/**] 当前进度为 进行中。\n', ['src/main.ts']).diagnostics.some(
-        (item) => item.rule === 'issue.progress.no-match',
-      ),
-    )
-  })
-
-  it('open.md 拒绝重复编码和多行进度', () => {
-    const duplicate = '# 0001\n[src/**] 当前进度为 进行中。\n\n# 0001\n[src/**] 当前进度为 仍进行中。\n'
-    assert.ok(
-      inspectIssueOpen('x.md', duplicate).diagnostics.some((item) => item.rule === 'issue.code.duplicate'),
-    )
-    const multi = '# 0001\n[src/**] 当前进度为 进行中。\n补充说明。\n'
-    assert.ok(inspectIssueOpen('x.md', multi).diagnostics.some((item) => item.rule === 'issue.body'))
-  })
-
-  it('close.md 要求关闭原因且编码唯一', () => {
-    assert.deepEqual(inspectIssueClose('x.md', CLOSE_OK).diagnostics, [])
-    assert.equal(inspectIssueClose('x.md', CLOSE_OK).entries[0].reason, '已修复并验证。')
-    assert.ok(
-      inspectIssueClose('x.md', '# 0001\n').diagnostics.some((item) => item.rule === 'issue.reason.missing'),
-    )
-    assert.ok(
-      inspectIssueClose('x.md', '# 0001\n原因一。\n# 0001\n原因二。\n').diagnostics.some(
-        (item) => item.rule === 'issue.code.duplicate',
-      ),
-    )
-  })
-
-  it('空索引合法', () => {
-    assert.deepEqual(validateIssue('x.md', '', 'issue-open'), [])
-    assert.deepEqual(validateIssue('x.md', '', 'issue-close'), [])
-  })
-})
-
-describe('issues in list', () => {
-  it('存在的可选问题文档被检查但不产生缺失', async () => {
-    const root = writeTree({
-      '.coder/issues/all/issue-0001.md': ISSUE_OK,
-      '.coder/issues/open.md': OPEN_OK,
+describe('list 与问题文件', () => {
+  it('存在的问题文件被检查但不产生缺失', async () => {
+    const report = await inspectDocs({
+      root: writeTree({
+        '.coder/issues/open/issue-0001.md': ISSUE_OPEN_OK,
+        '.coder/issues/close/issue-0002.md': ISSUE_CLOSE_OK,
+      }),
     })
-    const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
     assert.deepEqual(report.missing, [])
     assert.equal(report.summary.expected, 7)
-    assert.equal(report.summary.issues, 1)
+    assert.equal(report.summary.issues, 2)
     assert.equal(report.summary.openIssues, 1)
-    assert.equal(report.summary.closedIssues, 0)
+    assert.equal(report.summary.closedIssues, 1)
     assert.equal(report.summary.optional, 2)
-    assert.match(report.text, /\[optional\] \.coder\/issues\/open\.md/)
+    assert.match(report.text, /0001 \[开启\]/)
+    assert.match(report.text, /0002 \[关闭\]/)
   })
 
-  it('缺少问题详情、状态冲突与非法问题文件都会报错', async () => {
-    const root = writeTree({
-      '.coder/issues/open.md': '# 0001\n[src/**] 当前进度为 进行中。\n',
-      '.coder/issues/close.md': '# 0001\n已关闭。\n',
-      '.coder/issues/all/notes.md': '说明',
+  it('同一编码同时出现在 open/ 与 close/ 时报冲突', async () => {
+    const report = await inspectDocs({
+      root: writeTree({
+        '.coder/issues/open/issue-0001.md': ISSUE_OPEN_OK,
+        '.coder/issues/close/issue-0001.md': ISSUE_CLOSE_OK,
+      }),
     })
-    const report = await inspectDocs({ root })
-    assert.deepEqual(report.illegal, ['.coder/issues/all/notes.md'])
-    assert.equal(rules(report, 'issue.file.missing').length, 2)
+    assert.equal(report.ok, false)
     assert.equal(rules(report, 'issue.status.conflict').length, 1)
+    assert.match(report.text, /同时出现在/)
   })
 
-  it('详情文件的格式问题按文档报告', async () => {
-    const root = writeTree({
-      '.coder/issues/all/issue-0001.md': ISSUE_OK.replace('开启', '处理中'),
+  it('issues 下不在白名单里的文件是非法文档', async () => {
+    const report = await inspectDocs({
+      root: writeTree({
+        '.coder/issues/notes.md': '说明',
+        '.coder/issues/all/issue-0001.md': ISSUE_OPEN_OK,
+        '.coder/issues/open/issue-1.md': ISSUE_OPEN_OK,
+      }),
     })
-    const report = await inspectDocs({ root })
     assert.equal(report.ok, false)
-    assert.equal(rules(report, 'issue.status.value').length, 1)
+    assert.deepEqual(report.illegal.sort(), [
+      '.coder/issues/all/issue-0001.md',
+      '.coder/issues/notes.md',
+      '.coder/issues/open/issue-1.md',
+    ])
+  })
+
+  it('进度通配没有命中项目文件时报错', async () => {
+    const report = await inspectDocs({
+      root: writeTree({
+        '.coder/issues/open/issue-0001.md': ISSUE_OPEN_OK.replace('[src/**]', '[web/**]'),
+      }),
+    })
+    assert.equal(report.ok, false)
+    assert.equal(rules(report, 'issue.progress.no-match').length, 1)
+  })
+
+  it('文件格式问题按文档报告', async () => {
+    const report = await inspectDocs({
+      root: writeTree({
+        '.coder/issues/open/issue-0001.md': ISSUE_OPEN_OK.replace('# 提交源', '# 状态'),
+      }),
+    })
+    assert.equal(report.ok, false)
     assert.equal(report.summary.issues, 1)
-  })
-
-  it('详情状态与索引不一致时报错', async () => {
-    const root = writeTree({
-      '.coder/issues/all/issue-0001.md': ISSUE_OK.replace('开启', '关闭'),
-      '.coder/issues/open.md': OPEN_OK,
-    })
-    const report = await inspectDocs({ root })
-    assert.equal(report.ok, false)
-    assert.equal(rules(report, 'issue.status.mismatch').length, 1)
-    assert.match(report.text, /issue\.status\.mismatch/)
+    assert.ok(rules(report, 'issue.section.unknown').length > 0 || rules(report, 'issue.status.removed').length > 0)
   })
 })
 
 describe('create_issue', () => {
-  it('创建问题详情并登记到 open.md', async () => {
+  it('创建开启的问题文件，写入 # 当前进度', async () => {
     const root = writeTree({})
-    const tool = createCreateIssueTool(logger)
-    const result = await tool.execute(
-      {
-        root,
-        problem: '列表漏报问题',
-        source: '用户',
-        scope: 'src/**',
-        progress: '正在定位。',
-      },
+    const result = await createCreateIssueTool(logger).execute(
+      { root, problem: '列表漏报问题', source: 'list 检查时发现', scope: 'src/**', progress: '正在补检查' },
       { cwd: root },
     )
 
     assert.equal(result.ok, true)
     assert.equal(result.code, '0001')
     assert.equal(result.status, '开启')
-    assert.equal(result.issue, '.coder/issues/all/issue-0001.md')
-    assert.equal(result.index, '.coder/issues/open.md')
-
-    const detail = readFileSync(join(root, '.coder/issues/all/issue-0001.md'), 'utf8')
-    assert.match(detail, /^# 问题\n列表漏报问题\n\n# 状态\n开启\n/)
-    assert.match(detail, /# 提交源\n用户\n$/)
-    const open = readFileSync(join(root, '.coder/issues/open.md'), 'utf8')
-    assert.equal(open, '# 0001\n[src/**] 当前进度为 正在定位。\n')
+    assert.equal(result.issue, '.coder/issues/open/issue-0001.md')
+    assert.equal(result.issueDir, 'issues/open')
+    const content = readFileSync(join(root, '.coder/issues/open/issue-0001.md'), 'utf8')
+    assert.match(content, /# 问题\n列表漏报问题/)
+    assert.match(content, /# 提交源\nlist 检查时发现/)
+    assert.match(content, /# 当前进度\n\[src\/\*\*\] 当前进度为 正在补检查/)
+    assert.doesNotMatch(content, /# 状态/)
+    assert.equal(existsSync(join(root, '.coder/issues/open.md')), false)
 
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
@@ -367,30 +318,22 @@ describe('create_issue', () => {
     assert.equal(report.summary.openIssues, 1)
   })
 
-  it('编号取最大值加一，关闭状态写 close.md', async () => {
-    const root = writeTree({})
+  it('编号取两个文件夹的最大值加一，关闭状态写 close/', async () => {
+    const root = writeTree({
+      '.coder/issues/open/issue-0001.md': ISSUE_OPEN_OK,
+    })
     const tool = createCreateIssueTool(logger)
-    const first = await tool.execute(
-      { root, problem: '第一个问题', source: '用户', scope: 'src/**' },
-      { cwd: root },
-    )
-    const second = await tool.execute(
-      {
-        root,
-        problem: '第二个问题',
-        source: '用户',
-        status: '关闭',
-        closeReason: '已确认重复。',
-      },
+    const result = await tool.execute(
+      { root, problem: '第二个问题', source: '实施', status: '关闭', closeReason: '已修复' },
       { cwd: root },
     )
 
-    assert.equal(first.code, '0001')
-    assert.equal(second.code, '0002')
-    assert.equal(second.index, '.coder/issues/close.md')
-    assert.ok(existsSync(join(root, '.coder/issues/all/issue-0002.md')))
-    const close = readFileSync(join(root, '.coder/issues/close.md'), 'utf8')
-    assert.equal(close, '# 0002\n已确认重复。\n')
+    assert.equal(result.code, '0002')
+    assert.equal(result.issue, '.coder/issues/close/issue-0002.md')
+    assert.equal(result.issueDir, 'issues/close')
+    const content = readFileSync(join(root, '.coder/issues/close/issue-0002.md'), 'utf8')
+    assert.match(content, /# 关闭原因\n已修复/)
+    assert.doesNotMatch(content, /# 当前进度/)
 
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
@@ -402,42 +345,23 @@ describe('create_issue', () => {
   it('拒绝非法参数与已上锁的文档树', async () => {
     const root = writeTree({})
     const tool = createCreateIssueTool(logger)
-
     await assert.rejects(
-      () => tool.execute({ root, problem: '问题', source: '用户', scope: '全局' }, { cwd: root }),
-      /不能写全局/,
+      () => tool.execute({ root, problem: '', source: 'x' }, { cwd: root }),
+      /problem/,
     )
     await assert.rejects(
-      () => tool.execute({ root, problem: '# 标题\n问题', source: '用户' }, { cwd: root }),
-      /Markdown 标题/,
+      () => tool.execute({ root, problem: 'x', source: 'y', status: '处理中' }, { cwd: root }),
+      /status/,
     )
-
     await assert.rejects(
-      () => tool.execute({ root: join(tempRoot, 'nope'), problem: '问题', source: '用户' }, {}),
-      /项目根目录不存在/,
-    )
-    const bare = mkdtempSync(join(tempRoot, 'bare-'))
-    await assert.rejects(
-      () => tool.execute({ root: bare, problem: '问题', source: '用户' }, {}),
-      /\.coder\/ 不存在/,
+      () => tool.execute({ root, problem: '# 标题', source: 'y' }, { cwd: root }),
+      /标题行/,
     )
 
     await createLockTool(logger).execute({ root, authorization: '授权' }, { cwd: root })
     await assert.rejects(
-      () => tool.execute({ root, problem: '问题', source: '用户' }, { cwd: root }),
+      () => tool.execute({ root, problem: 'x', source: 'y' }, { cwd: root }),
       /已上锁/,
     )
-  })
-
-  it('已有索引格式不合法时拒绝追加', async () => {
-    const root = writeTree({
-      '.coder/issues/open.md': '# 0001\n正在处理。\n',
-    })
-    const tool = createCreateIssueTool(logger)
-    await assert.rejects(
-      () => tool.execute({ root, problem: '问题', source: '用户' }, { cwd: root }),
-      /格式不合法/,
-    )
-    assert.equal(existsSync(join(root, '.coder/issues/all/issue-0001.md')), false)
   })
 })

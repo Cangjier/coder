@@ -11,7 +11,7 @@
  * 为空、是否有反向表述、视角是否有图、场景是否有 mermaid 图、数据结构是否用
  * ts interface 表达、诊断码与作用范围是否合法、步骤格式与编号、文件通配范围
  * 是否命中、计划编码与字段顺序、编号条目和关联 ToDo 是否合法、模块索引与详情
- * 是否成对、问题索引与详情是否一致、成员名册的字段与成员流程的场景是否完整。
+ * 是否成对、问题文件夹与内容是否一致、成员名册的字段与成员流程的场景是否完整。
  * 判不了的（例如图是否真的描述了代码、任务是否真的完成）不猜，也不报。
  *
  * 文档目录、预期文档和格式规则都是固化的，不接受配置。
@@ -25,16 +25,7 @@ import path from 'node:path'
 import { validateArchitecture, validateData, validateFlow } from './design.js'
 import { DIAGNOSIS_DOCS, diagnosisSeverity, inspectDiagnosis } from './diagnosis.js'
 import { matchGlob } from './glob.js'
-import {
-  ISSUE_CLOSE,
-  ISSUE_OPEN,
-  inspectIssueAll,
-  inspectIssueClose,
-  inspectIssueOpen,
-  isIssueDoc,
-  issueKindOf,
-  issueNumber,
-} from './issue.js'
+import { inspectIssue, isIssueDoc, issueKindOf, issueNumber } from './issue.js'
 import { LOCK_DECLARATION, LOCK_RELATIVE, hashCoder, readLock } from './lock.js'
 import { analyzeMarkdown } from './markdown.js'
 import { inspectMembersAll, inspectMembersFlow, isMemberDoc, memberKindOf } from './member.js'
@@ -90,7 +81,7 @@ export class CoderError extends Error {
  * 目录里同名的 error.md / warn.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
- * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-all'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
+ * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
  */
 export function kindOf(relative) {
   if (relative === 'diagnosis/error.md') return 'diagnosis-error'
@@ -368,7 +359,7 @@ function validateFile(doc, analysis) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文档正文。
- * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-all'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
+ * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
  * @param {string[]} [files] - 项目文件；诊断文档用它检查文件通配范围。
  * @returns {object[]} 诊断。
  */
@@ -379,9 +370,10 @@ export function validateDocument(doc, text, kind, files) {
   if (kind.startsWith('plan-')) {
     return inspectPlan(doc, text, kind).diagnostics
   }
-  if (kind === 'issue-all') return inspectIssueAll(doc, text).diagnostics
-  if (kind === 'issue-open') return inspectIssueOpen(doc, text, files).diagnostics
-  if (kind === 'issue-close') return inspectIssueClose(doc, text).diagnostics
+  if (kind === 'issue-open' || kind === 'issue-close') {
+    const code = /issue-(\d{4})\.md$/.exec(doc)?.[1] ?? ''
+    return inspectIssue(doc, text, kind, code, files).diagnostics
+  }
   if (kind === 'members-all') return inspectMembersAll(doc, text).diagnostics
   if (kind === 'members-flow') return inspectMembersFlow(doc, text).diagnostics
   if (kind === 'modules') return inspectModules(doc, text).diagnostics
@@ -684,24 +676,13 @@ export async function inspectDocs({ root }) {
       const result = inspectPlan(doc, text, kind, planMetaOf(relative)?.code ?? null)
       diagnostics.push(...result.diagnostics)
       plans.push(...result.entries)
-    } else if (kind === 'issue-all') {
-      const result = inspectIssueAll(doc, text)
+    } else if (kind === 'issue-open' || kind === 'issue-close') {
+      const code = issueNumber(relative) ?? ''
+      const result = inspectIssue(doc, text, kind, code, await ensureProjectFiles())
       diagnostics.push(...result.diagnostics)
-      issues.all.push({
-        doc,
-        path: doc,
-        relative,
-        code: issueNumber(relative),
-        status: result.status,
-      })
-    } else if (kind === 'issue-open') {
-      const result = inspectIssueOpen(doc, text, await ensureProjectFiles())
-      diagnostics.push(...result.diagnostics)
-      issues.open.push(...result.entries)
-    } else if (kind === 'issue-close') {
-      const result = inspectIssueClose(doc, text)
-      diagnostics.push(...result.diagnostics)
-      issues.close.push(...result.entries)
+      const entry = { ...result.entry, doc, path: doc, relative }
+      if (kind === 'issue-open') issues.open.push(entry)
+      else issues.close.push(entry)
     } else if (kind === 'modules') {
       const result = inspectModules(doc, text)
       diagnostics.push(...result.diagnostics)
@@ -742,9 +723,12 @@ export async function inspectDocs({ root }) {
 
   modules.sort((a, b) => a.line - b.line)
   moduleDocs.sort((a, b) => a.relative.localeCompare(b.relative))
-  issues.open.sort((a, b) => a.line - b.line)
-  issues.close.sort((a, b) => a.line - b.line)
-  issues.all.sort((a, b) => a.relative.localeCompare(b.relative))
+  issues.open.sort((a, b) => a.code.localeCompare(b.code))
+  issues.close.sort((a, b) => a.code.localeCompare(b.code))
+  issues.all = [
+    ...issues.open.map((entry) => ({ code: entry.code, path: entry.path, status: '开启' })),
+    ...issues.close.map((entry) => ({ code: entry.code, path: entry.path, status: '关闭' })),
+  ]
 
   const indexedModules = new Map(modules.map((entry) => [entry.code, entry]))
   const moduleFiles = new Map(
@@ -788,60 +772,16 @@ export async function inspectDocs({ root }) {
     }
   }
 
-  const issueFiles = new Map(
-    issues.all.filter((entry) => entry.code !== null).map((entry) => [entry.code, entry]),
-  )
-  const openCodes = new Set(issues.open.map((entry) => entry.code))
-  for (const entry of issues.open) {
-    const detail = issueFiles.get(entry.code)
-    if (detail === undefined) {
-      diagnostics.push(
-        diagnostic(
-          entry.doc,
-          entry.line,
-          'issue.file.missing',
-          `进度索引引用了 ${entry.code}，但 ${DOCS_DIR}/issues/all/issue-${entry.code}.md 不存在。`,
-        ),
-      )
-    } else if (detail.status === '关闭') {
-      diagnostics.push(
-        diagnostic(
-          entry.doc,
-          entry.line,
-          'issue.status.mismatch',
-          `${entry.code} 的状态是 关闭，却出现在 ${DOCS_DIR}/${ISSUE_OPEN}；关闭的问题只保留在 close.md。`,
-        ),
-      )
-    }
-  }
+  const openIssues = new Map(issues.open.map((entry) => [entry.code, entry]))
   for (const entry of issues.close) {
-    const detail = issueFiles.get(entry.code)
-    if (detail === undefined) {
-      diagnostics.push(
-        diagnostic(
-          entry.doc,
-          entry.line,
-          'issue.file.missing',
-          `关闭索引引用了 ${entry.code}，但 ${DOCS_DIR}/issues/all/issue-${entry.code}.md 不存在。`,
-        ),
-      )
-    } else if (detail.status === '开启') {
-      diagnostics.push(
-        diagnostic(
-          entry.doc,
-          entry.line,
-          'issue.status.mismatch',
-          `${entry.code} 的状态是 开启，却出现在 ${DOCS_DIR}/${ISSUE_CLOSE}；开启的问题只保留在 open.md。`,
-        ),
-      )
-    }
-    if (openCodes.has(entry.code)) {
+    const other = openIssues.get(entry.code)
+    if (other !== undefined) {
       diagnostics.push(
         diagnostic(
           entry.doc,
           entry.line,
           'issue.status.conflict',
-          `${entry.code} 同时出现在 ${DOCS_DIR}/${ISSUE_OPEN} 与 ${DOCS_DIR}/${ISSUE_CLOSE}；一个问题只能有一个状态。`,
+          `${entry.code} 同时出现在 ${other.path} 与 ${entry.path}；一个问题只能放在 open/ 或 close/ 一个文件夹里。`,
         ),
       )
     }

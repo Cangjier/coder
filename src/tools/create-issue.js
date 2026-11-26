@@ -1,16 +1,19 @@
 /**
- * `create_issue` 工具：创建 `.coder/issues/all/issue-NNNN.md`。
+ * `create_issue` 工具：在 `.coder/issues/open/` 或 `.coder/issues/close/` 下创建
+ * `issue-NNNN.md`。
  *
- * 编号取当前所有问题编码（详情文件、open.md、close.md）的最大值加一，从
- * 0001 开始；编码固定 4 位。创建后按状态登记到 `issues/open.md`（开启）或
- * `issues/close.md`（关闭）。没有索引文件时一并创建，因此新建的问题立刻
- * 有一行可读的进度或关闭原因。
+ * 一个问题一个文件，状态由目录决定：
+ *
+ * - 开启：`issues/open/issue-NNNN.md`，文件以 `# 当前进度` 收尾；
+ * - 关闭：`issues/close/issue-NNNN.md`，文件以 `# 关闭原因` 收尾。
+ *
+ * 编号取两个目录里已有问题编码的最大值加一，从 0001 开始；编码固定 4 位。
  *
  * 工具只做确定性写入：
  *
  * - `.coder` 已上锁时拒绝执行，问题文档需要通过 unlock 或 update 流程变更；
  * - 生成的内容先按 `src/issue.js` 的规则自检，自检不过不落盘；
- * - 先写详情文件，再写索引；索引写入失败时删除刚创建的详情文件。
+ * - 只写一个文件，写入失败不会留下半成品。
  *
  * @module coder/tools/create-issue
  */
@@ -19,35 +22,13 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
 import { CoderError, DOCS_DIR } from '../docs.js'
-import {
-  ISSUE_ALL_DIR,
-  ISSUE_CLOSE,
-  ISSUE_OPEN,
-  inspectIssueAll,
-  inspectIssueClose,
-  inspectIssueOpen,
-} from '../issue.js'
+import { ISSUE_CLOSE_DIR, ISSUE_OPEN_DIR, inspectIssue } from '../issue.js'
 import { readLock } from '../lock.js'
 import { stepScopeIssue } from '../scope.js'
 import { resolveRoot } from './root.js'
 
-/** 详情文件名。 */
+/** 问题文件名。 */
 const ISSUE_FILE = /^issue-(\d{4})\.md$/
-
-/**
- * 读取文件；不存在时返回空串。
- *
- * @param {string} absolute - 绝对路径。
- * @returns {Promise<string>} 文件正文。
- */
-async function readOptional(absolute) {
-  try {
-    return await fs.readFile(absolute, 'utf8')
-  } catch (error) {
-    if (error && error.code === 'ENOENT') return ''
-    throw error
-  }
-}
 
 /**
  * 校验并规范化一个多行文本字段。
@@ -74,16 +55,22 @@ function textField(value, name, options = {}) {
 }
 
 /**
- * 拼出问题详情正文。
+ * 拼出问题文件正文。
  *
- * @param {{problem: string, status: string, reproduce: string|null, suggestion: string|null, source: string}} input - 正文内容。
+ * @param {{problem: string, reproduce: string|null, suggestion: string|null, source: string, scope: string, progress: string|null, closeReason: string|null}} input - 正文内容。
  * @returns {string} Markdown 正文。
  */
-function buildIssueContent({ problem, status, reproduce, suggestion, source }) {
-  const lines = ['# 问题', problem, '', '# 状态', status]
+function buildIssueContent({ problem, reproduce, suggestion, source, scope, progress, closeReason }) {
+  const lines = ['# 问题', problem]
   if (reproduce !== null) lines.push('', '# 复现', reproduce)
   if (suggestion !== null) lines.push('', '# 建议', suggestion)
-  lines.push('', '# 提交源', source, '')
+  lines.push('', '# 提交源', source)
+  if (closeReason !== null) {
+    lines.push('', '# 关闭原因', closeReason)
+  } else {
+    lines.push('', '# 当前进度', `[${scope}] 当前进度为 ${progress}`)
+  }
+  lines.push('')
   return lines.join('\n')
 }
 
@@ -95,38 +82,21 @@ function buildIssueContent({ problem, status, reproduce, suggestion, source }) {
  */
 async function usedNumbers(docsRoot) {
   const used = new Set()
-  const allDir = path.join(docsRoot, ...ISSUE_ALL_DIR.split('/'))
-
-  let entries = []
-  try {
-    entries = await fs.readdir(allDir, { withFileTypes: true })
-  } catch (error) {
-    if (!error || error.code !== 'ENOENT') throw error
+  for (const relative of [ISSUE_OPEN_DIR, ISSUE_CLOSE_DIR]) {
+    const absolute = path.join(docsRoot, ...relative.split('/'))
+    let entries = []
+    try {
+      entries = await fs.readdir(absolute, { withFileTypes: true })
+    } catch (error) {
+      if (!error || error.code !== 'ENOENT') throw error
+    }
+    for (const entry of entries) {
+      if (!entry.isFile()) continue
+      const match = ISSUE_FILE.exec(entry.name)
+      if (match !== null) used.add(Number(match[1]))
+    }
   }
-  for (const entry of entries) {
-    if (!entry.isFile()) continue
-    const match = ISSUE_FILE.exec(entry.name)
-    if (match !== null) used.add(Number(match[1]))
-  }
-
-  for (const relative of [ISSUE_OPEN, ISSUE_CLOSE]) {
-    const text = await readOptional(path.join(docsRoot, ...relative.split('/')))
-    for (const match of text.matchAll(/^#\s*(\d{4})\s*$/gm)) used.add(Number(match[1]))
-  }
-
   return used
-}
-
-/**
- * 追加一条索引条目。
- *
- * @param {string} existing - 已有正文。
- * @param {string} entry - 新条目，末尾带换行。
- * @returns {string} 追加后的正文。
- */
-function appendEntry(existing, entry) {
-  const trimmed = existing.replace(/\s+$/, '')
-  return trimmed === '' ? `${entry}\n` : `${trimmed}\n\n${entry}\n`
 }
 
 /**
@@ -139,9 +109,9 @@ export function createCreateIssueTool(logger) {
   return {
     name: 'create_issue',
     description: [
-      'Create a numbered issue under .coder/issues/all/issue-NNNN.md and register it in .coder/issues/open.md (status 开启) or .coder/issues/close.md (status 关闭).',
-      'The number is the maximum existing issue code plus one, starting at 0001, using 4 digits; existing detail files and both index files are considered. The detail file contains # 问题, # 状态, optional # 复现 and # 建议, and # 提交源. 状态 must be 开启 or 关闭. open.md entries read # 0001 followed by [scope] 当前进度为 ...; close.md entries read # 0001 followed by the close reason.',
-      'The generated content is validated against the issue format before writing; index files are created when absent. The tool refuses to write while .coder/lock.md exists: issue documents then change through unlock or the update flow. Nothing is committed to git.',
+      'Create one numbered issue file under .coder/issues/open/issue-NNNN.md (status 开启) or .coder/issues/close/issue-NNNN.md (status 关闭).',
+      'The number is the maximum existing issue code plus one, starting at 0001, using 4 digits; files in both folders are considered. The file contains # 问题, optional # 复现 and # 建议, # 提交源, and either # 当前进度 ([文件通配] 当前进度为 ...) for an open issue or # 关闭原因 for a closed issue. Status lives in the folder, not in the file.',
+      'The generated content is validated against the issue format before writing. The tool refuses to write while .coder/lock.md exists: issue documents then change through unlock or the update flow. Nothing is committed to git.',
     ].join(' '),
     parameters: {
       type: 'object',
@@ -163,7 +133,7 @@ export function createCreateIssueTool(logger) {
           type: 'string',
           enum: ['开启', '关闭'],
           description:
-            'Issue status written under # 状态. 开启 registers the issue in issues/open.md; 关闭 registers it in issues/close.md. Defaults to 开启.',
+            'Issue status. 开启 writes issues/open/issue-NNNN.md; 关闭 writes issues/close/issue-NNNN.md. Defaults to 开启.',
         },
         reproduce: {
           type: 'string',
@@ -176,15 +146,15 @@ export function createCreateIssueTool(logger) {
         scope: {
           type: 'string',
           description:
-            'File path glob used in the open.md progress line, for example src/**. Defaults to **; must match at least one project file for list to accept it.',
+            'File path glob used in the # 当前进度 line of an open issue, for example src/**. Defaults to **; list requires it to match at least one project file.',
         },
         progress: {
           type: 'string',
-          description: 'Progress text used in the open.md entry. Defaults to 已登记，等待处理。',
+          description: 'Progress text used after「[scope] 当前进度为」in an open issue. Defaults to 已登记，等待处理。',
         },
         closeReason: {
           type: 'string',
-          description: 'Close reason used in the close.md entry when status is 关闭. Defaults to 已关闭。',
+          description: 'Close reason written under # 关闭原因 when status is 关闭. Defaults to 已关闭。',
         },
       },
       required: ['problem', 'source'],
@@ -265,45 +235,16 @@ export function createCreateIssueTool(logger) {
         throw new CoderError('问题编码已用尽：0001 到 9999 都已被占用。')
       }
       const code = String(next).padStart(4, '0')
-      const relative = `${ISSUE_ALL_DIR}/issue-${code}.md`
+      const issueDir = status === '开启' ? ISSUE_OPEN_DIR : ISSUE_CLOSE_DIR
+      const kind = status === '开启' ? 'issue-open' : 'issue-close'
+      const relative = `${issueDir}/issue-${code}.md`
       const issueDoc = `${DOCS_DIR}/${relative}`
       const issueAbsolute = path.join(docsRoot, ...relative.split('/'))
-      const content = buildIssueContent({ problem, status, reproduce, suggestion, source })
+      const content = buildIssueContent({ problem, reproduce, suggestion, source, scope, progress, closeReason })
 
-      const selfCheck = inspectIssueAll(issueDoc, content)
+      const selfCheck = inspectIssue(issueDoc, content, kind, code)
       if (selfCheck.diagnostics.length > 0) {
         throw new CoderError(`生成的问题内容不符合格式：${selfCheck.diagnostics[0].message}`)
-      }
-
-      const indexRelative = status === '开启' ? ISSUE_OPEN : ISSUE_CLOSE
-      const indexDoc = `${DOCS_DIR}/${indexRelative}`
-      const indexAbsolute = path.join(docsRoot, ...indexRelative.split('/'))
-      const existing = await readOptional(indexAbsolute).catch((error) => {
-        throw new CoderError(
-          `无法读取 ${indexDoc}：${error instanceof Error ? error.message : String(error)}`,
-        )
-      })
-      if (existing.trim() !== '') {
-        const check =
-          status === '开启' ? inspectIssueOpen(indexDoc, existing) : inspectIssueClose(indexDoc, existing)
-        if (check.diagnostics.length > 0) {
-          throw new CoderError(
-            `${indexDoc} 当前格式不合法（${check.diagnostics[0].rule}：${check.diagnostics[0].message}）；请先修正索引。`,
-          )
-        }
-      }
-
-      const entry =
-        status === '开启'
-          ? `# ${code}\n[${scope}] 当前进度为 ${progress}`
-          : `# ${code}\n${closeReason}`
-      const nextIndex = appendEntry(existing, entry)
-      const indexCheck =
-        status === '开启'
-          ? inspectIssueOpen(indexDoc, nextIndex)
-          : inspectIssueClose(indexDoc, nextIndex)
-      if (indexCheck.diagnostics.length > 0) {
-        throw new CoderError(`生成的索引内容不符合格式：${indexCheck.diagnostics[0].message}`)
       }
 
       await fs.mkdir(path.dirname(issueAbsolute), { recursive: true })
@@ -318,16 +259,6 @@ export function createCreateIssueTool(logger) {
         )
       }
 
-      try {
-        await fs.mkdir(path.dirname(indexAbsolute), { recursive: true })
-        await fs.writeFile(indexAbsolute, nextIndex, 'utf8')
-      } catch (error) {
-        await fs.rm(issueAbsolute, { force: true }).catch(() => {})
-        throw new CoderError(
-          `无法写入 ${indexDoc}：${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-
       logger.info(`coder: create_issue created ${issueDoc} (${status})`)
       return {
         ok: true,
@@ -335,13 +266,12 @@ export function createCreateIssueTool(logger) {
         number: next,
         status,
         issue: issueDoc,
-        index: indexDoc,
-        scope,
+        issueDir,
+        scope: status === '开启' ? scope : null,
         text: [
-          `已创建问题 ${code}。`,
-          `详情：${issueDoc}`,
-          `索引：${indexDoc}（${status}）`,
-          status === '开启' ? `进度：[${scope}] ${progress}` : `关闭原因：${closeReason}`,
+          `已创建${status === '开启' ? '开启' : '关闭'}的问题 ${code}。`,
+          `文件：${issueDoc}`,
+          status === '开启' ? `进度：[${scope}] 当前进度为 ${progress}` : `关闭原因：${closeReason}`,
           '未提交 git；需要提交时按项目流程处理。',
         ].join('\n'),
       }

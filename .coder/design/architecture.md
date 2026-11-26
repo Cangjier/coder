@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题与成员文档由 list 校验格式和交叉引用，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题文件与成员文档由 list 校验格式和交叉引用，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -29,7 +29,7 @@ flowchart TB
     diag["诊断码校验"]
     plan["计划文档校验"]
     module["模块文档校验"]
-    issueDoc["问题文档校验"]
+    issueDoc["问题文件校验"]
     memberDoc["成员文档校验"]
     scope["作用范围命中"]
     lockHash["lock.md hash 校验"]
@@ -104,7 +104,7 @@ flowchart LR
 ```
 
 ## 局部视角：模块与问题
-只回答「模块和问题文档如何被校验」：模块按索引与详情成对检查，问题按详情段落、索引编码与状态冲突检查。
+只回答「模块和问题文件如何被校验」：模块按索引与详情成对检查，问题文件按段落、进度或关闭原因与文件夹状态检查。
 
 ```mermaid
 flowchart LR
@@ -112,9 +112,9 @@ flowchart LR
   B --> C{索引与详情成对?}
   C -- 否 --> D[报 module.* 诊断]
   C -- 是 --> E[记录 modules / moduleDocs]
-  F[读取 issues/] --> G[校验详情、进度与关闭原因]
-  G --> H{编码冲突或详情缺失?}
-  H -- 是 --> I[报 issue.* 诊断]
+  F[读取 issues/open 与 issues/close] --> G[校验段落、当前进度与关闭原因]
+  G --> H{同一编码同时在两边?}
+  H -- 是 --> I[报 issue.status.conflict]
   H -- 否 --> J[记录 issues]
 ```
 

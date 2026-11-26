@@ -31,9 +31,8 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | `.coder/plan/todo/archived/T0001.md` | T 开头的已归档待办（可选） |
 | `.coder/plan/goal/G0001.md` | G 开头的进行中目标，一项一个文件（可选） |
 | `.coder/plan/goal/archived/G0001.md` | G 开头的已归档目标（可选） |
-| `.coder/issues/all/issue-NNNN.md` | 问题详情（可选） |
-| `.coder/issues/open.md` | 进行中问题的进度（可选） |
-| `.coder/issues/close.md` | 已关闭问题的原因（可选） |
+| `.coder/issues/open/issue-NNNN.md` | 开启的问题，一个问题一个文件（可选） |
+| `.coder/issues/close/issue-NNNN.md` | 关闭的问题，一个问题一个文件（可选） |
 | `.coder/members/all.md` | 主对话与成员的身份、工作范围，成员的备注（可选） |
 | `.coder/members/flow.md` | 成员之间的工作流程（可选） |
 
@@ -45,7 +44,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 `modules.md` 是模块索引：只用 `# 0001` 这样的 4 位编码加一行模块说明，空文件表示还没有拆分模块。`module-NNNN.md` 是可选的模块详情，把 `# 架构`（全局视角必填、局部视角可选）、`# 流程`、`# 数据结构` 和可选的 `# 子模块` 收进一份文档；子模块用 `## 0002` 加说明表达。模块是设计文档的枝干/叶子，`architecture.md` 仍然是顶层设计。索引里的每个编码都要有对应的模块文件，存在的模块文件也必须出现在索引里。
 
-问题文档记录当前框架在实施过程中发现的问题：`issues/all/issue-NNNN.md` 写 `# 问题`、`# 状态`（开启/关闭）、可选的 `# 复现` 与 `# 建议`、以及 `# 提交源`；`issues/open.md` 写 `# 0001` 加 `[文件通配] 当前进度为 ...`；`issues/close.md` 写 `# 0001` 加关闭原因。三个文件都是可选的，`list` 只在存在时检查。同一个编码不能同时出现在 open.md 与 close.md；开启的问题只保留在 open.md、关闭的问题只保留在 close.md，详情状态与索引不一致会报错；索引引用的编码必须有详情文件。`create_issue` 负责按最大编码加一创建详情并登记索引。
+问题文件记录当前框架在实施过程中发现的问题：一个问题一个文件，文件名是 `issue-NNNN.md`，状态由文件夹决定——开启的问题放 `issues/open/`，关闭的问题放 `issues/close/`。文件里按 `# 问题`、可选的 `# 复现` 与 `# 建议`、`# 提交源`、`# 当前进度`（开启）或 `# 关闭原因`（关闭）写正文；不再写 `# 状态`。两个文件夹都是可选的，`list` 只在文件存在时检查；同一个编码不能同时出现在 open/ 与 close/。`create_issue` 负责按最大编码加一在对应文件夹创建问题文件。
 
 成员文档记录协作关系：`members/all.md` 先写 `# 主对话` 的 `身份` 与 `工作范围`，再用 `# 成员1`、`# 成员2` 等一级标题写每个成员的 `工作区名称`、`身份`、`工作范围`，以及可选的 `备注`（写在最后，用来记录部署方式、SSH 用户等补充信息）；字段顺序固定、值不能为空，成员编号在同一份文档里不能重复。成员可以为零，只有 `# 主对话` 也是合法状态。`members/flow.md` 用 `## 场景` 加非空 `mermaid` 图讲解成员之间的工作流程，规则与 `design/flow.md` 相同。两个文件都是可选的，`list` 只在存在时检查。
 
@@ -58,13 +57,13 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 `list` 每次调用做十一件事：
 
 1. 罗列 `.coder/` 下的所有文档，`lock.md` 标为 `lock`。
-2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`members/all.md`、`members/flow.md`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
+2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`members/all.md`、`members/flow.md`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
 3. 列出所有**缺失**的预期文档；可选文档不存在时不报缺失。
 4. 按 [`docs/design.md`](docs/design.md) 的格式约定诊断每个存在的 Markdown 文档，返回带行号的诊断记录。
 5. 解析两份诊断文档：校验编码前缀与 4 位数字、作用范围、诊断方式、步骤格式、步骤编号、文件通配命中和日志围栏。
 6. 解析计划条目文件：校验目录与文件名编码、标题编码是否一致，字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及同一编码是否同时留在 active 与 archived。
 7. 解析 `modules.md` 和存在的 `module-NNNN.md`：校验模块编码、说明、架构/流程/数据结构分段、子模块引用，以及索引与详情文件是否成对。
-8. 解析可选的 `issues/all/issue-NNNN.md`、`open.md` 与 `close.md`：校验详情段落、状态、进度行、关闭原因、编码唯一性、索引与详情文件的对应关系，以及 open 与 close 是否冲突、详情状态与索引是否一致。
+8. 解析可选的 `issues/open/issue-NNNN.md` 与 `issues/close/issue-NNNN.md`：校验文件名编码、段落顺序、当前进度、关闭原因，以及同一编码是否同时出现在 open/ 与 close/。
 9. 解析可选的 `members/all.md` 与 `members/flow.md`：校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
 10. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`file.md` 中出现 `.coder` 会报错。
 11. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
@@ -134,9 +133,9 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 }
 ```
 
-问题文档记录当前框架在实施过程中发现的问题。`create_issue` 扫描 `.coder/issues/all/issue-NNNN.md`、`open.md` 与 `close.md`，取已用编码最大值加一，从 `0001` 开始创建详情文件；`开启` 时追加到 `open.md`（写 `[scope] 当前进度为 ...`），`关闭` 时追加到 `close.md`（写关闭原因）。`reproduce` 和 `suggestion` 可选，分别写入 `# 复现` 与 `# 建议`；`# 提交源` 记录发现问题的工具、文档或实施步骤。
+问题文件记录当前框架在实施过程中发现的问题。`create_issue` 扫描 `.coder/issues/open/` 与 `.coder/issues/close/`，取已用编码最大值加一，从 `0001` 开始；`开启` 写 `issues/open/issue-NNNN.md`（以 `# 当前进度` 收尾，内容为 `[scope] 当前进度为 ...`），`关闭` 写 `issues/close/issue-NNNN.md`（以 `# 关闭原因` 收尾）。状态由文件夹决定，文件里不写 `# 状态`。`reproduce` 和 `suggestion` 可选，分别写入 `# 复现` 与 `# 建议`；`# 提交源` 记录发现问题的工具、文档或实施步骤。
 
-索引文件不存在时创建；已有索引格式不合法时拒绝追加。生成的内容先按问题格式自检，自检不过不落盘。`.coder` 已上锁时拒绝直接写入，问题文档需要通过 unlock 或 update 流程变更。工具不提交 git。
+生成的内容先按问题格式自检，自检不过不落盘。`.coder` 已上锁时拒绝直接写入，问题文档需要通过 unlock 或 update 流程变更。工具不提交 git。
 
 ## 固化约定
 
@@ -150,8 +149,8 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | 诊断码 | `error.md` 只允许 `E\d{4}`，`warn.md` 只允许 `W\d{4}` |
 | 计划编码 | `plan/todo/` 与 `plan/todo/archived/` 只允许 `T\d{4}.md`，`plan/goal/` 与 `plan/goal/archived/` 只允许 `G\d{4}.md`；文件名必须与标题一致 |
 | 模块编码 | `modules.md`、`module-NNNN.md` 与子模块只允许 `\d{4}` |
-| 问题编码 | 问题详情、open.md 与 close.md 只允许 `\d{4}` |
-| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/design/module-NNNN.md`、`.coder/issues/open.md`、`.coder/issues/close.md`、`.coder/issues/all/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
+| 问题编码 | `issues/open/` 与 `issues/close/` 下只允许 `issue-\d{4}.md`，状态由文件夹决定 |
+| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/design/module-NNNN.md`、`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
 | 锁 hash | 所有 `.coder` 文件（除 lock.md）内容 sha256 拼接后再 sha256 |
 | 默认渲染输出 | `dist/.coder/design.html` |
 
