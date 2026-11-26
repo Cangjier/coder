@@ -123,10 +123,10 @@ function writeValidTree() {
     '.coder/design/modules.md': MODULES_EMPTY,
     '.coder/diagnosis/error.md': ERROR_OK,
     '.coder/diagnosis/warn.md': WARN_OK,
-    '.coder/plan/todo.md': PLAN_TODO,
-    '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-    '.coder/plan/goal.md': PLAN_GOAL,
-    '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+    '.coder/plan/todo/T0001.md': PLAN_TODO,
+    '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+    '.coder/plan/goal/G0001.md': PLAN_GOAL,
+    '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
   })
 }
 
@@ -152,8 +152,8 @@ describe('inspectDocs', () => {
     assert.deepEqual(report.illegal, [])
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.diagnostics, [])
-    assert.equal(report.summary.expected, 11)
-    assert.equal(report.summary.found, 11)
+    assert.equal(report.summary.expected, 7)
+    assert.equal(report.summary.found, 7)
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 
@@ -167,10 +167,10 @@ describe('inspectDocs', () => {
         '.coder/design/modules.md': MODULES_EMPTY,
         '.coder/diagnosis/error.md': ERROR_OK,
         '.coder/diagnosis/warn.md': WARN_OK,
-        '.coder/plan/todo.md': PLAN_TODO,
-        '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-        '.coder/plan/goal.md': PLAN_GOAL,
-        '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+        '.coder/plan/todo/T0001.md': PLAN_TODO,
+        '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+        '.coder/plan/goal/G0001.md': PLAN_GOAL,
+        '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
         '.coder/design/extra.md': '# extra\n多余文档\n',
         '.coder/design/notes.txt': 'not markdown',
       }),
@@ -191,10 +191,10 @@ describe('inspectDocs', () => {
       '.coder/design/modules.md': MODULES_EMPTY,
       '.coder/diagnosis/error.md': ERROR_OK,
       '.coder/diagnosis/warn.md': WARN_OK,
-      '.coder/plan/todo.md': PLAN_TODO,
-      '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-      '.coder/plan/goal.md': PLAN_GOAL,
-      '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+      '.coder/plan/todo/T0001.md': PLAN_TODO,
+      '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+      '.coder/plan/goal/G0001.md': PLAN_GOAL,
+      '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
     })
     const report = await inspect(root)
     assert.equal(report.ok, false)
@@ -212,16 +212,16 @@ describe('inspectDocs', () => {
       '.coder/design/modules.md': MODULES_EMPTY,
       '.coder/diagnosis/error.md': '',
       '.coder/diagnosis/warn.md': '',
-      '.coder/plan/todo.md': PLAN_TODO,
-      '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-      '.coder/plan/goal.md': PLAN_GOAL,
-      '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+      '.coder/plan/todo/T0001.md': PLAN_TODO,
+      '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+      '.coder/plan/goal/G0001.md': PLAN_GOAL,
+      '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
     })
     const report = await inspect(root)
     assert.equal(report.ok, true)
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.diagnostics, [])
-    assert.equal(report.summary.found, 11)
+    assert.equal(report.summary.found, 7)
     assert.equal(report.summary.codes, 0)
   })
 
@@ -229,7 +229,7 @@ describe('inspectDocs', () => {
     const root = mkdtempSync(join(tempRoot, 'empty-'))
     const report = await inspect(root)
     assert.equal(report.docsRootExists, false)
-    assert.equal(report.missing.length, 11)
+    assert.equal(report.missing.length, 7)
     assert.equal(report.ok, false)
     assert.match(report.text, /不存在/)
   })
@@ -250,10 +250,10 @@ describe('inspectDocs', () => {
       '.coder/design/modules.md': MODULES_EMPTY,
       '.coder/diagnosis/error.md': ERROR_OK,
       '.coder/diagnosis/warn.md': WARN_OK,
-      '.coder/plan/todo.md': PLAN_TODO,
-      '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-      '.coder/plan/goal.md': PLAN_GOAL,
-      '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+      '.coder/plan/todo/T0001.md': PLAN_TODO,
+      '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+      '.coder/plan/goal/G0001.md': PLAN_GOAL,
+      '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
       'README.md': '# hello\n',
       'extra.txt': 'x',
     })
@@ -625,6 +625,64 @@ export interface Diagnostic {
   })
 })
 
+describe('计划条目文件', () => {
+  const base = {
+    '.coder/design/file.md': FILE_OK,
+    '.coder/design/architecture.md': ARCHITECTURE_OK,
+    '.coder/design/flow.md': FLOW_OK,
+    '.coder/design/data_structure.md': DATA_OK,
+    '.coder/design/modules.md': MODULES_EMPTY,
+    '.coder/diagnosis/error.md': ERROR_OK,
+    '.coder/diagnosis/warn.md': WARN_OK,
+  }
+
+  it('没有计划文件时不报缺失', async () => {
+    const report = await inspect(writeTree(base))
+    assert.equal(report.ok, true)
+    assert.deepEqual(report.missing, [])
+    assert.equal(report.summary.expected, 7)
+    assert.equal(report.summary.plans, 0)
+  })
+
+  it('文件名与标题编码不一致报 plan.file.code', async () => {
+    const report = await inspect(
+      writeTree({
+        ...base,
+        '.coder/plan/todo/T0002.md': PLAN_TODO,
+      }),
+    )
+    assert.equal(report.ok, false)
+    assert.deepEqual(report.missing, [])
+    assert.equal(rules(report, 'plan.file.code').length, 1)
+    assert.equal(report.summary.plans, 0)
+  })
+
+  it('空计划文件报 plan.no-code', async () => {
+    const report = await inspect(
+      writeTree({
+        ...base,
+        '.coder/plan/goal/G0001.md': '',
+      }),
+    )
+    assert.equal(report.ok, false)
+    assert.equal(rules(report, 'plan.no-code').length, 1)
+  })
+
+  it('计划文件属于可选文档，不进入预期文档计数', async () => {
+    const report = await inspect(
+      writeTree({
+        ...base,
+        '.coder/plan/todo/T0001.md': PLAN_TODO,
+      }),
+    )
+    assert.equal(report.ok, true)
+    const status = report.documents.find((document) => document.path === '.coder/plan/todo/T0001.md')
+    assert.equal(status.status, 'optional')
+    assert.equal(report.summary.plans, 1)
+    assert.equal(report.summary.optional, 1)
+  })
+})
+
 describe('fixed document set', () => {
   it('文档目录与预期文档是固化的', () => {
     assert.equal(DOCS_DIR, '.coder')
@@ -636,10 +694,6 @@ describe('fixed document set', () => {
     'design/modules.md',
     'diagnosis/error.md',
     'diagnosis/warn.md',
-    'plan/todo.md',
-    'plan/todo-archived.md',
-    'plan/goal.md',
-    'plan/goal-archived.md',
   ])
   })
 })

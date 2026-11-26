@@ -5,7 +5,7 @@
  * `<root>/.coder/` 下的文件全部列出来，与预期集合比对，再按
  * `docs/design.md` 的格式约定逐份诊断。
  *
- * 五份设计文档、两份诊断文档和四份计划文档的规则都以「确定性」为前提，可选
+ * 五份设计文档、两份诊断文档和计划条目文件的规则都以「确定性」为前提，可选
  * 的模块详情、问题文档与成员文档共用同一套检查；
  * 所以只做能够机械判定的检查：标题路径是否合法、同一路径是否重复、说明是否
  * 为空、是否有反向表述、视角是否有图、场景是否有 mermaid 图、数据结构是否用
@@ -46,7 +46,7 @@ import {
   moduleKindOf,
   moduleNumber,
 } from './module.js'
-import { PLAN_DOCS, inspectPlan, planKindOf } from './plan.js'
+import { inspectPlan, planKindOf, planMetaOf } from './plan.js'
 
 export { analyzeMarkdown }
 
@@ -61,7 +61,6 @@ export const EXPECTED_DOCS = Object.freeze([
   'design/data_structure.md',
   MODULES_DOC,
   ...DIAGNOSIS_DOCS,
-  ...PLAN_DOCS,
 ])
 
 /** 会被当作 Markdown 诊断的扩展名。 */
@@ -88,7 +87,7 @@ export class CoderError extends Error {
  * 根据文档路径推断它属于哪一类格式。
  *
  * 设计文档用 basename 判断；诊断文档和计划文档按完整相对路径判断，避免其他
- * 目录里同名的 error.md / warn.md / todo.md 被误认。
+ * 目录里同名的 error.md / warn.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
  * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-all'|'issue-open'|'issue-close'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
@@ -120,7 +119,12 @@ export function kindOf(relative) {
  * @returns {boolean} 是否是可选文档。
  */
 export function isOptionalDoc(relative) {
-  return isOptionalModuleDoc(relative) || isIssueDoc(relative) || isMemberDoc(relative)
+  return (
+    planKindOf(relative) !== null ||
+    isOptionalModuleDoc(relative) ||
+    isIssueDoc(relative) ||
+    isMemberDoc(relative)
+  )
 }
 
 /**
@@ -677,7 +681,7 @@ export async function inspectDocs({ root }) {
       diagnostics.push(...result.diagnostics)
       diagnoses.push(...result.codes)
     } else if (kind.startsWith('plan-')) {
-      const result = inspectPlan(doc, text, kind)
+      const result = inspectPlan(doc, text, kind, planMetaOf(relative)?.code ?? null)
       diagnostics.push(...result.diagnostics)
       plans.push(...result.entries)
     } else if (kind === 'issue-all') {
@@ -716,7 +720,7 @@ export async function inspectDocs({ root }) {
   }
 
   const planRank = (entry) => (entry.kind === 'todo' ? 0 : 2) + (entry.archived ? 1 : 0)
-  plans.sort((a, b) => planRank(a) - planRank(b) || a.line - b.line)
+  plans.sort((a, b) => planRank(a) - planRank(b) || a.code.localeCompare(b.code))
 
   const planCodes = new Map()
   for (const entry of plans) {

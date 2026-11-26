@@ -95,11 +95,12 @@ function writeProject(label = 'project') {
   writeFileSync(join(root, '.coder', 'design', 'modules.md'), MODULES_EMPTY)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
-  mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
-  writeFileSync(join(root, '.coder', 'plan', 'todo.md'), PLAN_TODO)
-  writeFileSync(join(root, '.coder', 'plan', 'todo-archived.md'), PLAN_TODO_ARCHIVED)
-  writeFileSync(join(root, '.coder', 'plan', 'goal.md'), PLAN_GOAL)
-  writeFileSync(join(root, '.coder', 'plan', 'goal-archived.md'), PLAN_GOAL_ARCHIVED)
+  mkdirSync(join(root, '.coder', 'plan', 'todo', 'archived'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'plan', 'goal', 'archived'), { recursive: true })
+  writeFileSync(join(root, '.coder', 'plan', 'todo', 'T0001.md'), PLAN_TODO)
+  writeFileSync(join(root, '.coder', 'plan', 'todo', 'archived', 'T0002.md'), PLAN_TODO_ARCHIVED)
+  writeFileSync(join(root, '.coder', 'plan', 'goal', 'G0001.md'), PLAN_GOAL)
+  writeFileSync(join(root, '.coder', 'plan', 'goal', 'archived', 'G0002.md'), PLAN_GOAL_ARCHIVED)
   return root
 }
 
@@ -110,7 +111,7 @@ describe('renderDesign', () => {
     assert.equal(result.ok, true)
     assert.equal(result.output, join(root, 'dist', '.coder', 'design.html'))
     assert.equal(result.healthy, true)
-    assert.equal(result.summary.found, 11)
+    assert.equal(result.summary.found, 7)
     assert.ok(existsSync(result.output))
 
     const html = readFileSync(result.output, 'utf8')
@@ -130,8 +131,8 @@ describe('renderDesign', () => {
     assert.match(html, /\.coder\/design\/file\.md/)
     assert.match(html, /\.coder\/design\/data_structure\.md/)
     assert.match(html, /\.coder\/diagnosis\/error\.md/)
-    assert.match(html, /\.coder\/plan\/todo\.md/)
-    assert.match(html, /\.coder\/plan\/goal-archived\.md/)
+    assert.match(html, /\.coder\/plan\/todo\/T0001\.md/)
+    assert.match(html, /\.coder\/plan\/goal\/archived\/G0002\.md/)
     assert.match(html, /W0001/)
     assert.match(html, /T0001/)
     assert.match(html, /G0002/)
@@ -139,6 +140,8 @@ describe('renderDesign', () => {
     assert.match(html, /doc-fallback/)
     assert.match(html, /breaks: diagnosis \|\| plan/)
     assert.match(html, /href="#architecture"/)
+    assert.match(html, /id="plan-todo-T0001"/)
+    assert.match(html, /id="plan-goal-archived-G0002"/)
   })
 
   it('脚本被禁用时正文仍然可读', async () => {

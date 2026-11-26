@@ -109,10 +109,10 @@ function writeProject(errorText, warnText, extra = {}) {
     '.coder/design/modules.md': MODULES_EMPTY,
     '.coder/diagnosis/error.md': errorText,
     '.coder/diagnosis/warn.md': warnText,
-    '.coder/plan/todo.md': PLAN_TODO,
-    '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-    '.coder/plan/goal.md': PLAN_GOAL,
-    '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+    '.coder/plan/todo/T0001.md': PLAN_TODO,
+    '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+    '.coder/plan/goal/G0001.md': PLAN_GOAL,
+    '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
     ...extra,
   })
 }
@@ -457,7 +457,7 @@ describe('list 与诊断文档', () => {
     })
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
-    assert.equal(report.summary.expected, 11)
+    assert.equal(report.summary.expected, 7)
     assert.equal(report.summary.codes, 2)
     assert.equal(report.diagnoses[0].method, '静态代码审查')
     assert.equal(report.diagnoses[0].steps.length, 2)

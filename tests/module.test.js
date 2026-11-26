@@ -108,7 +108,7 @@ after(() => {
 })
 
 /**
- * 写一棵文档树；默认补齐十一份预期文档和一个项目文件。
+ * 写一棵文档树；默认补齐七份预期文档和一个项目文件。
  *
  * @param {Record<string, string>} files - 相对于临时根的路径到内容。
  * @returns {string} 临时根目录。
@@ -123,10 +123,6 @@ function writeTree(files) {
     '.coder/design/modules.md': '',
     '.coder/diagnosis/error.md': '',
     '.coder/diagnosis/warn.md': '',
-    '.coder/plan/todo.md': '',
-    '.coder/plan/todo-archived.md': '',
-    '.coder/plan/goal.md': '',
-    '.coder/plan/goal-archived.md': '',
     'src/main.ts': 'export const value = 1\n',
     ...files,
   }
@@ -298,7 +294,7 @@ describe('modules in list', () => {
     })
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
-    assert.equal(report.summary.expected, 11)
+    assert.equal(report.summary.expected, 7)
     assert.equal(report.summary.modules, 2)
     assert.equal(report.summary.moduleFiles, 2)
     assert.equal(report.summary.optional, 2)

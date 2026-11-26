@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划、模块、问题与成员文档由 list 校验格式和交叉引用，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题与成员文档由 list 校验格式和交叉引用，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -89,13 +89,13 @@ flowchart LR
   G --> H
 ```
 
-## 局部视角：计划文档
-只回答「todo / goal 如何被校验和归档」：编码、字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及 active 与 archived 是否重复。
+## 局部视角：计划条目
+只回答「todo / goal 单条目文件如何被校验和归档」：文件名与标题编码、字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及 active 与 archived 是否重复。
 
 ```mermaid
 flowchart LR
-  A[读取 todo / goal 与归档文档] --> B[解析 # T0001 / # G0001]
-  B --> C[校验前缀与 4 位数字]
+  A[读取 plan/todo 与 plan/goal 下的单条目文件] --> B[校验文件名编码与 # T0001 / # G0001 一致]
+  B --> C[校验目录前缀与 4 位数字]
   C --> D[校验字段顺序与编号条目]
   D --> E[校验完成预期、进度通配与关联 ToDo]
   E --> F{同一编码在 active 与 archived?}
@@ -165,7 +165,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取十一份预期文档]
+  A[render 调用] --> B[读取七份预期文档与计划条目]
   B --> C[读取存在的模块详情]
   C --> D[汇总诊断]
   D --> E[生成 HTML]

@@ -81,13 +81,14 @@ after(() => {
 
 /**
  * 在某份计划文档上跑一次校验。
- * @param {string} text - 文档正文。
+ * @param {string} text - 文件正文。
  * @param {string} [kind] - 文档类型。
  * @param {string} [doc] - 展示用路径。
+ * @param {string|null} [code] - 文件名编码；null 时不检查文件名与标题是否一致。
  * @returns {object[]} 诊断。
  */
-function check(text, kind = 'plan-todo', doc = '.coder/plan/todo.md') {
-  return validatePlan(doc, text, kind)
+function check(text, kind = 'plan-todo', doc = '.coder/plan/todo/T0001.md', code = null) {
+  return validatePlan(doc, text, kind, code)
 }
 
 /**
@@ -115,13 +116,14 @@ function writeProject(overrides = {}) {
     '.coder/design/modules.md': MODULES_EMPTY,
     '.coder/diagnosis/error.md': ERROR_OK,
     '.coder/diagnosis/warn.md': WARN_OK,
-    '.coder/plan/todo.md': PLAN_TODO,
-    '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED,
-    '.coder/plan/goal.md': PLAN_GOAL,
-    '.coder/plan/goal-archived.md': PLAN_GOAL_ARCHIVED,
+    '.coder/plan/todo/T0001.md': PLAN_TODO,
+    '.coder/plan/todo/archived/T0002.md': PLAN_TODO_ARCHIVED,
+    '.coder/plan/goal/G0001.md': PLAN_GOAL,
+    '.coder/plan/goal/archived/G0002.md': PLAN_GOAL_ARCHIVED,
     ...overrides,
   }
   for (const [relative, content] of Object.entries(files)) {
+    if (content === null) continue
     const absolute = join(root, ...relative.split('/'))
     mkdirSync(join(absolute, '..'), { recursive: true })
     writeFileSync(absolute, content)
@@ -131,7 +133,7 @@ function writeProject(overrides = {}) {
 
 describe('todo 文档', () => {
   it('合法 todo 解析出编码、范围、优先级、条目数与进度', () => {
-    const result = inspectPlan('.coder/plan/todo.md', TODO, 'plan-todo')
+    const result = inspectPlan('.coder/plan/todo/T0001.md', TODO, 'plan-todo')
     assert.deepEqual(result.diagnostics, [])
     assert.equal(result.entries.length, 1)
     assert.deepEqual(
@@ -156,15 +158,20 @@ describe('todo 文档', () => {
     )
   })
 
-  it('空文档合法；非空但没有编码时报错', () => {
-    assert.deepEqual(check(''), [])
+  it('空文件和非空但无编码标题的文件都报错', () => {
+    assert.ok(ruleOf(check(''), 'plan.no-code'))
     assert.ok(ruleOf(check('只有正文\n'), 'plan.no-code'))
   })
 
-  it('编码前缀、格式和重复都会报错', () => {
+  it('编码前缀、格式和第二个编码都会报错', () => {
     assert.ok(ruleOf(check(TODO.replace('# T0001', '# G0001')), 'plan.code.prefix'))
     assert.ok(ruleOf(check(TODO.replace('# T0001', '# T001')), 'plan.code.format'))
-    assert.ok(ruleOf(check(`${TODO}\n${TODO}`), 'plan.code.duplicate'))
+    assert.ok(ruleOf(check(`${TODO}\n${TODO}`), 'plan.code.multiple'))
+  })
+
+  it('文件名编码必须与标题编码一致', () => {
+    assert.deepEqual(check(TODO, 'plan-todo', '.coder/plan/todo/T0001.md', 'T0001'), [])
+    assert.ok(ruleOf(check(TODO, 'plan-todo', '.coder/plan/todo/T0002.md', 'T0002'), 'plan.file.code'))
   })
 
   it('编码标题之前有正文时报错', () => {
@@ -219,7 +226,7 @@ describe('todo 文档', () => {
 
 describe('goal 文档', () => {
   it('合法 goal 解析出编码、范围与关联 ToDo 数', () => {
-    const result = inspectPlan('.coder/plan/goal.md', GOAL, 'plan-goal')
+    const result = inspectPlan('.coder/plan/goal/G0001.md', GOAL, 'plan-goal')
     assert.deepEqual(result.diagnostics, [])
     assert.equal(result.entries[0].code, 'G0001')
     assert.equal(result.entries[0].kind, 'goal')
@@ -228,25 +235,25 @@ describe('goal 文档', () => {
   })
 
   it('goal 不接受优先级字段', () => {
-    assert.ok(ruleOf(check(GOAL.replace('完成预期：', '优先级：P1\n\n完成预期：'), 'plan-goal', '.coder/plan/goal.md'), 'plan.field.unexpected'))
+    assert.ok(ruleOf(check(GOAL.replace('完成预期：', '优先级：P1\n\n完成预期：'), 'plan-goal', '.coder/plan/goal/G0001.md'), 'plan.field.unexpected'))
   })
 
   it('关联 ToDo 必须是 T 加 4 位数字，编号必须连续', () => {
-    assert.ok(ruleOf(check(GOAL.replace('1. T0001', '1. X0001'), 'plan-goal', '.coder/plan/goal.md'), 'plan.todo.format'))
-    assert.ok(ruleOf(check(GOAL.replace('1. T0001', '2. T0001'), 'plan-goal', '.coder/plan/goal.md'), 'plan.todo.number'))
-    assert.ok(ruleOf(check(GOAL.replace('1. T0001', ''), 'plan-goal', '.coder/plan/goal.md'), 'plan.todo.empty'))
+    assert.ok(ruleOf(check(GOAL.replace('1. T0001', '1. X0001'), 'plan-goal', '.coder/plan/goal/G0001.md'), 'plan.todo.format'))
+    assert.ok(ruleOf(check(GOAL.replace('1. T0001', '2. T0001'), 'plan-goal', '.coder/plan/goal/G0001.md'), 'plan.todo.number'))
+    assert.ok(ruleOf(check(GOAL.replace('1. T0001', ''), 'plan-goal', '.coder/plan/goal/G0001.md'), 'plan.todo.empty'))
   })
 
   it('goal 文档拒绝 T 编码', () => {
-    assert.ok(ruleOf(check(GOAL.replace('# G0001', '# T0001'), 'plan-goal', '.coder/plan/goal.md'), 'plan.code.prefix'))
+    assert.ok(ruleOf(check(GOAL.replace('# G0001', '# T0001'), 'plan-goal', '.coder/plan/goal/G0001.md'), 'plan.code.prefix'))
   })
 })
 
 describe('list 与计划文档', () => {
-  it('完整文档树解析四份计划并输出计划汇总', async () => {
+  it('完整文档树解析四个计划条目并输出计划汇总', async () => {
     const report = await inspectDocs({ root: writeProject() })
     assert.equal(report.ok, true)
-    assert.equal(report.summary.expected, 11)
+    assert.equal(report.summary.expected, 7)
     assert.equal(report.summary.plans, 4)
     assert.equal(report.plans.length, 4)
     assert.match(report.text, /计划：/)
@@ -254,11 +261,11 @@ describe('list 与计划文档', () => {
     assert.match(report.text, /G0002 \[归档\] goal｜src\/\*\*｜完成预期 1｜关联 ToDo 1/)
   })
 
-  it('active 计划文档为空时仍然合法', async () => {
+  it('没有 active 计划文件时仍然合法', async () => {
     const report = await inspectDocs({
       root: writeProject({
-        '.coder/plan/todo.md': '',
-        '.coder/plan/goal.md': '',
+        '.coder/plan/todo/T0001.md': null,
+        '.coder/plan/goal/G0001.md': null,
       }),
     })
     assert.equal(report.ok, true)
@@ -266,10 +273,10 @@ describe('list 与计划文档', () => {
     assert.match(report.text, /T0002 \[归档\]/)
   })
 
-  it('同一编码同时留在 active 与 archived 时报错', async () => {
+  it('同一编码同时留在 active 与 archived 目录时报错', async () => {
     const report = await inspectDocs({
       root: writeProject({
-        '.coder/plan/todo-archived.md': PLAN_TODO_ARCHIVED.replace('# T0002', '# T0001'),
+        '.coder/plan/todo/archived/T0001.md': PLAN_TODO,
       }),
     })
     assert.equal(report.ok, false)
@@ -277,8 +284,20 @@ describe('list 与计划文档', () => {
     assert.match(report.text, /同时出现在/)
   })
 
+  it('计划目录里文件名不合法的文件按非法文档报告', async () => {
+    const report = await inspectDocs({
+      root: writeProject({
+        '.coder/plan/todo/T1.md': PLAN_TODO,
+        '.coder/plan/todo.md': PLAN_TODO,
+      }),
+    })
+    assert.equal(report.ok, false)
+    assert.ok(report.illegal.includes('.coder/plan/todo/T1.md'))
+    assert.ok(report.illegal.includes('.coder/plan/todo.md'))
+  })
+
   it('通过 validateDocument 走计划格式分支', () => {
-    const report = validateDocument('.coder/plan/todo.md', TODO.replace('优先级：P1', '优先级：P9'), 'plan-todo')
+    const report = validateDocument('.coder/plan/todo/T0001.md', TODO.replace('优先级：P1', '优先级：P9'), 'plan-todo')
     assert.ok(ruleOf(report, 'plan.priority.value'))
   })
 })

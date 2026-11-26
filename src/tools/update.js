@@ -1,7 +1,8 @@
 /**
- * `update` 工具：用 `tmp/` 下的源文件替换 `.coder/` 里的文档。
+ * `update` 工具：用 `tmp/` 下的源文件替换 `.coder/` 里的文档，或删除 `.coder/`
+ * 里不再需要的文档。
  *
- * 未上锁：直接替换，返回「未上锁、不推荐」提示，不提交。
+ * 未上锁：直接替换或删除，返回「未上锁、不推荐」提示，不提交。
  *
  * 已上锁：分两步。
  *
@@ -69,7 +70,7 @@ const pending = new Map()
  */
 async function normalizeUpdates(root, updates) {
   if (!Array.isArray(updates) || updates.length === 0) {
-    throw new CoderError('updates 必须是非空数组，每项包含 source 和 target。')
+    throw new CoderError('updates 必须是非空数组，每项包含 target，以及 source 或 delete: true。')
   }
 
   const tmpRoot = path.resolve(root, 'tmp')
@@ -84,13 +85,53 @@ async function normalizeUpdates(root, updates) {
   const targets = new Set()
   for (const item of updates) {
     if (item === null || typeof item !== 'object') {
-      throw new CoderError('updates 的每一项必须是 { source, target } 对象。')
+      throw new CoderError('updates 的每一项必须是 { source, target } 或 { target, delete: true } 对象。')
     }
-    const { source, target } = item
-    if (typeof source !== 'string' || typeof target !== 'string') {
-      throw new CoderError('updates 的 source 和 target 必须是字符串。')
+    const { source, target, delete: remove } = item
+    if (typeof target !== 'string') {
+      throw new CoderError('updates 的 target 必须是字符串。')
     }
-    if (source.includes('\\') || target.includes('\\')) {
+    if (remove !== undefined && typeof remove !== 'boolean') {
+      throw new CoderError('updates 的 delete 必须是布尔值。')
+    }
+    if (target.includes('\\')) {
+      throw new CoderError('路径必须使用 / 分隔。')
+    }
+    const issue = targetIssue(target)
+    if (issue !== null) {
+      throw new CoderError(issue)
+    }
+    if (targets.has(target)) {
+      throw new CoderError(`target 重复：${target}`)
+    }
+    targets.add(target)
+
+    const targetAbsolute = path.resolve(root, ...target.split('/'))
+    const targetStat = await fs.lstat(targetAbsolute).catch(() => null)
+
+    if (remove === true) {
+      if (source !== undefined && source !== null) {
+        throw new CoderError('delete 项不需要 source。')
+      }
+      if (targetStat === null || !targetStat.isFile()) {
+        throw new CoderError(`要删除的 target 不存在或不是普通文件：${target}`)
+      }
+      normalized.push({
+        source: null,
+        target,
+        sourceAbsolute: null,
+        targetAbsolute,
+        content: null,
+        contentHash: null,
+        delete: true,
+      })
+      continue
+    }
+
+    if (typeof source !== 'string') {
+      throw new CoderError('没有 delete: true 的更新项必须提供 source。')
+    }
+    if (source.includes('\\')) {
       throw new CoderError('路径必须使用 / 分隔。')
     }
     const sourceSegments = source.split('/')
@@ -103,14 +144,6 @@ async function normalizeUpdates(root, updates) {
     ) {
       throw new CoderError(`source 必须是 tmp/ 下的相对路径：${source}`)
     }
-    const issue = targetIssue(target)
-    if (issue !== null) {
-      throw new CoderError(issue)
-    }
-    if (targets.has(target)) {
-      throw new CoderError(`target 重复：${target}`)
-    }
-    targets.add(target)
 
     const sourceAbsolute = path.resolve(root, ...source.split('/'))
     const sourceStat = await fs.lstat(sourceAbsolute).catch(() => null)
@@ -121,8 +154,6 @@ async function normalizeUpdates(root, updates) {
     if (realSource !== realTmp && !realSource.startsWith(`${realTmp}${path.sep}`)) {
       throw new CoderError(`源文件必须位于 tmp/ 下：${source}`)
     }
-    const targetAbsolute = path.resolve(root, ...target.split('/'))
-    const targetStat = await fs.lstat(targetAbsolute).catch(() => null)
     if (targetStat !== null && !targetStat.isFile()) {
       throw new CoderError(`target 已存在但不是普通文件：${target}`)
     }
@@ -134,6 +165,7 @@ async function normalizeUpdates(root, updates) {
       targetAbsolute,
       content,
       contentHash: sha256Hex(content),
+      delete: false,
     })
   }
   return normalized
@@ -186,8 +218,8 @@ function assertSameUpdates(current, previous) {
   for (let index = 0; index < current.length; index += 1) {
     const now = current[index]
     const before = previous[index]
-    if (now.source !== before.source || now.target !== before.target) {
-      throw new CoderError('第二次调用的 updates 与第一次不一致：source/target 不同。')
+    if (now.source !== before.source || now.target !== before.target || now.delete !== before.delete) {
+      throw new CoderError('第二次调用的 updates 与第一次不一致：source/target/delete 不同。')
     }
     if (now.contentHash !== before.contentHash) {
       throw new CoderError(`第二次调用前源文件内容发生变化：${now.source}`)
@@ -203,9 +235,25 @@ function assertSameUpdates(current, previous) {
  */
 async function applyUpdates(updates) {
   for (const item of updates) {
+    if (item.delete === true) {
+      await fs.rm(item.targetAbsolute)
+      continue
+    }
     await fs.mkdir(path.dirname(item.targetAbsolute), { recursive: true })
     await fs.writeFile(item.targetAbsolute, item.content)
   }
+}
+
+/**
+ * 把一项更新整理成结果里展示的形状。
+ *
+ * @param {object} item - 规范化后的更新项。
+ * @returns {{source?: string, target: string, delete?: boolean}} 展示用条目。
+ */
+function describeUpdate(item) {
+  return item.delete === true
+    ? { target: item.target, delete: true }
+    : { source: item.source, target: item.target }
 }
 
 /**
@@ -218,8 +266,8 @@ export function createUpdateTool(logger) {
   return {
     name: 'update',
     description: [
-      'Replace .coder/ documents with source files staged under tmp/.',
-      'updates is a non-empty array of { source, target }: source must be a file under the project tmp/ directory, and target is any file under .coder/ except .coder/lock.md. target may be an existing file or a new file; missing parent directories are created.',
+      'Replace or delete .coder/ documents. Source files are staged under tmp/.',
+      'updates is a non-empty array. Each item is either { source, target } or { target, delete: true }: source must be a file under the project tmp/ directory, target is any file under .coder/ except .coder/lock.md, and target may be an existing file or a new file; missing parent directories are created. A { target, delete: true } item removes an existing .coder/ file, which is how a completed plan entry leaves plan/todo/ or plan/goal/ when it is archived under archived/.',
       'Without a lock, update replaces the targets directly, returns a warning that the tree is unlocked and that update is intended for process changes, and makes no commit.',
       'While locked, update checks the lock hash on every call and refuses on a mismatch. The first call (no key) validates input, generates a random key, and returns a plan without modifying files: dsh must start a subagent to review the tmp sources and decide supplement or adjustment. The second call passes the same updates, the key, decision (supplement or adjustment), and review (the original user authorization text). It re-checks the lock hash and source hashes, replaces the files, updates the lock hash, and commits.',
       'supplement commits on the current branch. adjustment first commits the current working tree as a checkpoint, then creates the new branch named by the second call\'s branch argument, then replaces, hashes, and commits. The second adjustment call must pass branch; the second supplement call must omit it. No push and no complex rollback: git and the fs sandbox are the backstop.',
@@ -235,21 +283,27 @@ export function createUpdateTool(logger) {
         updates: {
           type: 'array',
           description:
-            'Files to replace. Each item maps a tmp/ source file to one .coder/ target file; .coder/lock.md is not allowed.',
+            'Files to replace or delete. Each item maps a tmp/ source file to one .coder/ target file, or deletes a .coder/ target with delete: true; .coder/lock.md is not allowed.',
           items: {
             type: 'object',
             properties: {
               source: {
                 type: 'string',
-                description: 'Source file path relative to the project root; must start with tmp/.',
+                description:
+                  'Source file path relative to the project root; must start with tmp/. Omit when delete is true.',
               },
               target: {
                 type: 'string',
                 description:
-                  'Target path under .coder/, for example .coder/design/flow.md or .coder/plan/todo.md. .coder/lock.md is not allowed.',
+                  'Target path under .coder/, for example .coder/design/flow.md or .coder/plan/todo/T0001.md. .coder/lock.md is not allowed.',
+              },
+              delete: {
+                type: 'boolean',
+                description:
+                  'Delete the target instead of replacing it. The target must already exist as a regular file.',
               },
             },
-            required: ['source', 'target'],
+            required: ['target'],
             additionalProperties: false,
           },
         },
@@ -299,12 +353,14 @@ export function createUpdateTool(logger) {
 
       if (state === null) {
         await applyUpdates(updates)
-        logger.info(`coder: update applied ${updates.length} files without a lock`)
+        const applied = updates.filter((item) => item.delete !== true).length
+        const removed = updates.length - applied
+        logger.info(`coder: update applied ${applied} files and deleted ${removed} files without a lock`)
         return {
           locked: false,
-          applied: updates.map((item) => ({ source: item.source, target: item.target })),
+          applied: updates.map(describeUpdate),
           text: [
-            `未上锁：已直接替换 ${updates.length} 个文件。`,
+            `未上锁：已替换 ${applied} 个文件、删除 ${removed} 个文件。`,
             '不推荐在未上锁时走 update；update 是用于流程变更的，未上锁时直接修改更简单。',
           ].join('\n'),
         }
@@ -320,6 +376,7 @@ export function createUpdateTool(logger) {
             source: item.source,
             target: item.target,
             contentHash: item.contentHash,
+            delete: item.delete,
           })),
         })
         logger.info(`coder: update issued a key for ${updates.length} files (${generated.slice(0, 8)}…)`)
@@ -327,11 +384,11 @@ export function createUpdateTool(logger) {
           locked: true,
           phase: 'review',
           key: generated,
-          files: updates.map((item) => ({ source: item.source, target: item.target })),
+          files: updates.map(describeUpdate),
           text: [
             '已上锁。update 第一步只生成密钥，没有修改文件。',
             `密钥：${generated}`,
-            `源文件：${updates.map((item) => item.source).join(', ')}`,
+            `源文件：${updates.filter((item) => item.delete !== true).map((item) => item.source).join(', ') || '无'}`,
             `目标文件：${updates.map((item) => item.target).join(', ')}`,
             '',
             '下一步：',
@@ -392,9 +449,9 @@ export function createUpdateTool(logger) {
           branch: branchBefore,
           commit,
           hash,
-          files: updates.map((item) => ({ source: item.source, target: item.target })),
+          files: updates.map(describeUpdate),
           text: [
-            `已按补充替换 ${updates.length} 个文件。`,
+            `已按补充执行 ${updates.length} 项更新（替换或删除）。`,
             `分支：${branchBefore}`,
             `commit：${commit ?? '无变化，未产生 commit'}`,
             `新 hash：sha256:${hash}`,
@@ -422,9 +479,9 @@ export function createUpdateTool(logger) {
         checkpoint,
         commit,
         hash,
-        files: updates.map((item) => ({ source: item.source, target: item.target })),
+        files: updates.map(describeUpdate),
         text: [
-          `已按调整新建分支并替换 ${updates.length} 个文件。`,
+          `已按调整新建分支并执行 ${updates.length} 项更新（替换或删除）。`,
           `checkpoint：${checkpoint ?? '工作区干净，无需 checkpoint'}`,
           `分支：${branch}`,
           `commit：${commit ?? '无变化，未产生 commit'}`,

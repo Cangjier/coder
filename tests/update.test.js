@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
@@ -111,11 +111,12 @@ function writeProject(label = 'project') {
   writeFileSync(join(root, '.coder', 'design', 'modules.md'), MODULES_EMPTY)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
-  mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
-  writeFileSync(join(root, '.coder', 'plan', 'todo.md'), PLAN_TODO)
-  writeFileSync(join(root, '.coder', 'plan', 'todo-archived.md'), PLAN_TODO_ARCHIVED)
-  writeFileSync(join(root, '.coder', 'plan', 'goal.md'), PLAN_GOAL)
-  writeFileSync(join(root, '.coder', 'plan', 'goal-archived.md'), PLAN_GOAL_ARCHIVED)
+  mkdirSync(join(root, '.coder', 'plan', 'todo', 'archived'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'plan', 'goal', 'archived'), { recursive: true })
+  writeFileSync(join(root, '.coder', 'plan', 'todo', 'T0001.md'), PLAN_TODO)
+  writeFileSync(join(root, '.coder', 'plan', 'todo', 'archived', 'T0002.md'), PLAN_TODO_ARCHIVED)
+  writeFileSync(join(root, '.coder', 'plan', 'goal', 'G0001.md'), PLAN_GOAL)
+  writeFileSync(join(root, '.coder', 'plan', 'goal', 'archived', 'G0002.md'), PLAN_GOAL_ARCHIVED)
   git(root, 'init', '-q')
   git(root, 'config', 'user.email', 'coder@example.test')
   git(root, 'config', 'user.name', 'coder test')
@@ -188,30 +189,46 @@ describe('update 未上锁', () => {
     writeFileSync(join(root, 'tmp', 'new-todo.md'), next)
 
     const result = await createUpdateTool(logger).execute(
-      { root, updates: [{ source: 'tmp/new-todo.md', target: '.coder/plan/todo.md' }] },
+      { root, updates: [{ source: 'tmp/new-todo.md', target: '.coder/plan/todo/T0001.md' }] },
       { cwd: root },
     )
 
     assert.equal(result.locked, false)
-    assert.match(readFileSync(join(root, '.coder', 'plan', 'todo.md'), 'utf8'), /解析与校验已更新/)
+    assert.match(readFileSync(join(root, '.coder', 'plan', 'todo', 'T0001.md'), 'utf8'), /解析与校验已更新/)
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
   })
 
-  it('允许新建 .coder 下不存在的预期文档', async () => {
+  it('允许新建 .coder 下不存在的目标文件', async () => {
     const root = writeProject()
-    rmSync(join(root, '.coder', 'plan', 'goal.md'))
+    rmSync(join(root, '.coder', 'plan', 'goal', 'G0001.md'))
     writeFileSync(join(root, 'tmp', 'new-goal.md'), PLAN_GOAL)
 
     const result = await createUpdateTool(logger).execute(
-      { root, updates: [{ source: 'tmp/new-goal.md', target: '.coder/plan/goal.md' }] },
+      { root, updates: [{ source: 'tmp/new-goal.md', target: '.coder/plan/goal/G0001.md' }] },
       { cwd: root },
     )
 
     assert.equal(result.locked, false)
-    assert.equal(readFileSync(join(root, '.coder', 'plan', 'goal.md'), 'utf8'), PLAN_GOAL)
+    assert.equal(readFileSync(join(root, '.coder', 'plan', 'goal', 'G0001.md'), 'utf8'), PLAN_GOAL)
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
+  })
+
+  it('未上锁时按 delete 删除目标文件', async () => {
+    const root = writeProject()
+    const target = '.coder/plan/todo/T0001.md'
+    const result = await createUpdateTool(logger).execute(
+      { root, updates: [{ target, delete: true }] },
+      { cwd: root },
+    )
+
+    assert.equal(result.locked, false)
+    assert.deepEqual(result.applied, [{ target, delete: true }])
+    assert.equal(existsSync(join(root, '.coder', 'plan', 'todo', 'T0001.md')), false)
+    const report = await inspectDocs({ root })
+    assert.equal(report.ok, true)
+    assert.equal(report.summary.plans, 3)
   })
 
   it('拒绝 tmp 之外的源文件和非法目标', async () => {
@@ -233,6 +250,17 @@ describe('update 未上锁', () => {
     await assert.rejects(
       () => tool.execute({ root, updates: [{ source: 'tmp/x.md', target: '.coder/../outside.md' }] }, { cwd: root }),
       /target 不能包含/,
+    )
+    await assert.rejects(
+      () => tool.execute(
+        { root, updates: [{ source: 'tmp/x.md', target: '.coder/plan/todo/T0001.md', delete: true }] },
+        { cwd: root },
+      ),
+      /delete 项不需要 source/,
+    )
+    await assert.rejects(
+      () => tool.execute({ root, updates: [{ target: '.coder/plan/todo/T9999.md', delete: true }] }, { cwd: root }),
+      /不存在/,
     )
   })
 })
@@ -284,6 +312,30 @@ describe('update 已上锁', () => {
       () => tool.execute({ root, updates: UPDATES, key: first.key, decision: 'supplement', review: '授权补充' }, { cwd: root }),
       /key 无效/,
     )
+  })
+
+  it('已上锁时按 delete 删除计划条目并提交', async () => {
+    const root = writeProject()
+    await createLockTool(logger).execute({ root, authorization: '授权归档' }, { cwd: root })
+    const tool = createUpdateTool(logger)
+    const updates = [{ target: '.coder/plan/todo/T0001.md', delete: true }]
+
+    const first = await tool.execute({ root, updates }, { cwd: root })
+    assert.equal(first.phase, 'review')
+    assert.deepEqual(first.files, [{ target: '.coder/plan/todo/T0001.md', delete: true }])
+
+    const second = await tool.execute(
+      { root, updates, key: first.key, decision: 'supplement', review: '授权归档' },
+      { cwd: root },
+    )
+
+    assert.equal(second.decision, 'supplement')
+    assert.match(second.commit, /^[0-9a-f]{40}$/)
+    assert.equal(existsSync(join(root, '.coder', 'plan', 'todo', 'T0001.md')), false)
+    assert.match(git(root, 'log', '-1', '--format=%s'), /supplement/)
+    const report = await inspectDocs({ root })
+    assert.equal(report.ok, true)
+    assert.equal(report.lock.hashMatches, true)
   })
 
   it('第一次和第二次之间源文件变化时拒绝', async () => {

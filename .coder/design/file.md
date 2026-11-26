@@ -23,7 +23,7 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/scope.js
 作用范围：全局与文件路径通配的合法性校验，以及通配命中。
 ## src/plan.js
-计划文档：解析 todo / goal 及归档文档，校验编码、字段顺序、编号、完成预期、当前进度与关联 ToDo。
+计划条目：解析 plan/todo 与 plan/goal 下的 T####/G#### 单条目文件（含 archived），校验文件名与标题编码、字段顺序、编号、完成预期、当前进度与关联 ToDo。
 ## src/module.js
 模块文档：解析 modules.md 与可选的 module-NNNN.md，校验模块编码、说明、架构/流程/数据结构分段与子模块引用。
 ## src/issue.js
@@ -35,7 +35,7 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/git.js
 update 的 git 操作：提交指定文件、checkpoint 与新建分支。
 ## src/render.js
-HTML 渲染：把十一份预期文档、存在的模块详情和存在的成员文档写成单页 design.html。
+HTML 渲染：把七份预期文档、存在的计划条目、存在的模块详情和存在的成员文档写成单页 design.html。
 # src/tools
 工具定义目录。
 ## src/tools/list.js
@@ -47,17 +47,17 @@ HTML 渲染：把十一份预期文档、存在的模块详情和存在的成员
 ## src/tools/root.js
 所有工具共用的项目根目录解析。
 ## src/tools/update.js
-`update` 工具：校验 tmp 源与 .coder 目标、上锁时分两步、替换并更新 hash，按 decision 提交。
+`update` 工具：校验 tmp 源与 .coder 目标、上锁时分两步、替换或删除并更新 hash，按 decision 提交。
 ## src/tools/create-issue.js
 `create_issue` 工具：按最大编码加一创建问题详情，并登记到 open.md 或 close.md。
 # tests
 测试目录。
 ## tests/docs.test.js
-覆盖扫描、缺失、非法、文件覆盖与十一份文档的格式诊断。
+覆盖扫描、缺失、非法、文件覆盖与七份文档及计划条目的格式诊断。
 ## tests/diagnosis.test.js
 覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。
 ## tests/plan.test.js
-覆盖计划编码、字段、编号、完成预期、当前进度、关联 ToDo 与归档一致性。
+覆盖计划文件名与编码、字段、编号、完成预期、当前进度、关联 ToDo 与归档一致性。
 ## tests/module.test.js
 覆盖模块索引、模块详情、子模块引用、索引交叉检查与渲染收录。
 ## tests/issue.test.js

@@ -15,7 +15,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 ## .coder 文档树
 
-项目根目录下的 `.coder/` 按约定维护五份设计文档、两份诊断文档和四份计划文档，并可选维护模块详情、成员文档与问题文档：
+项目根目录下的 `.coder/` 按约定维护五份设计文档和两份诊断文档，并可选维护计划条目文件、模块详情、成员文档与问题文档：
 
 | 文档 | 作用 |
 | --- | --- |
@@ -27,17 +27,17 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | `.coder/design/module-NNNN.md` | 模块详情（可选） |
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
-| `.coder/plan/todo.md` | T 开头的进行中待办 |
-| `.coder/plan/todo-archived.md` | T 开头的已归档待办 |
-| `.coder/plan/goal.md` | G 开头的进行中目标 |
-| `.coder/plan/goal-archived.md` | G 开头的已归档目标 |
+| `.coder/plan/todo/T0001.md` | T 开头的进行中待办，一项一个文件（可选） |
+| `.coder/plan/todo/archived/T0001.md` | T 开头的已归档待办（可选） |
+| `.coder/plan/goal/G0001.md` | G 开头的进行中目标，一项一个文件（可选） |
+| `.coder/plan/goal/archived/G0001.md` | G 开头的已归档目标（可选） |
 | `.coder/issues/all/issue-NNNN.md` | 问题详情（可选） |
 | `.coder/issues/open.md` | 进行中问题的进度（可选） |
 | `.coder/issues/close.md` | 已关闭问题的原因（可选） |
 | `.coder/members/all.md` | 主对话与成员的身份、工作范围，成员的备注（可选） |
 | `.coder/members/flow.md` | 成员之间的工作流程（可选） |
 
-计划文档用编码组织：todo 只放 `T` 加 4 位数字（如 `T0001`），goal 只放 `G` 加 4 位数字（如 `G0001`）。todo 写 `任务范围`、`优先级`（P1/P2/P3）、`完成预期` 和 `当前进度`；goal 写 `任务范围`、`完成预期` 和 `关联ToDo`。完成预期条目写成 `如果 ... 则 ...，否则 ...`，当前进度条目写成 `[文件通配] 说明`。任务完成后从 active 文档移到 archived 文档；同一个编码不能同时留在两边。空计划文档表示当前没有待办或归档记录。归档时用 `update` 替换 active 与 archived 文档，把完成条目从 active 移入 archived。字段之间空一行，Markdown 才会逐行显示。
+计划条目一项一个文件，文件名就是编码：todo 放 `plan/todo/T0001.md`（进行中）和 `plan/todo/archived/T0001.md`（已归档），goal 放 `plan/goal/G0001.md` 和 `plan/goal/archived/G0001.md`。todo 目录只放 `T` 加 4 位数字，goal 目录只放 `G` 加 4 位数字；文件里的 `# T0001` / `# G0001` 标题必须与文件名一致。todo 写 `任务范围`、`优先级`（P1/P2/P3）、`完成预期` 和 `当前进度`；goal 写 `任务范围`、`完成预期` 和 `关联ToDo`。完成预期条目写成 `如果 ... 则 ...，否则 ...`，当前进度条目写成 `[文件通配] 说明`。任务完成后把条目移到 `archived/` 目录；同一个编码不能同时留在两边。没有计划文件表示当前没有待办或归档记录；计划文件为空、或一份文件里出现两个编码标题都会报错。归档时用 `update` 写入 archived 文件，再用 `{ "target": ".coder/plan/todo/T0001.md", "delete": true }` 删除 active 文件。字段之间空一行，Markdown 才会逐行显示。
 
 `architecture.md` 用 Mermaid `flowchart` + `subgraph` 画多张图：第一个 `## 全局视角`，后面是若干 `## 局部视角：<名称>`。每个视角一段说明 + 一张图。`data_structure.md` 只记录跨模块的关键结构，按 `##` 分段，用 `ts` 围栏和 TypeScript `interface` 表达。
 
@@ -49,7 +49,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 成员文档记录协作关系：`members/all.md` 先写 `# 主对话` 的 `身份` 与 `工作范围`，再用 `# 成员1`、`# 成员2` 等一级标题写每个成员的 `工作区名称`、`身份`、`工作范围`，以及可选的 `备注`（写在最后，用来记录部署方式、SSH 用户等补充信息）；字段顺序固定、值不能为空，成员编号在同一份文档里不能重复。成员可以为零，只有 `# 主对话` 也是合法状态。`members/flow.md` 用 `## 场景` 加非空 `mermaid` 图讲解成员之间的工作流程，规则与 `design/flow.md` 相同。两个文件都是可选的，`list` 只在存在时检查。
 
-`.coder/lock.md` 是锁状态文件，不属于十一份预期文档；`list` 会把它标为 `lock`，`render` 不渲染它。模块详情、成员文档和问题文档属于可选白名单，存在时检查、不存在不报缺失。
+`.coder/lock.md` 是锁状态文件，不属于七份预期文档；`list` 会把它标为 `lock`，`render` 不渲染它。模块详情、成员文档和问题文档属于可选白名单，存在时检查、不存在不报缺失。
 
 `file.md` 的路径支持通配：`*` 匹配一个路径段内的任意字符，`**` 匹配零层或多层目录。`tmp/**` 同时表达目录 `tmp` 和它下面的文件，不需要再写 `tmp`。项目里的每个文件（`.coder` 自身除外）都必须被至少一个路径/通配覆盖。`.coder` 自身或它下面的路径不能出现在 `file.md` 中，出现会报 `file.entry.coder`。
 
@@ -58,11 +58,11 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 `list` 每次调用做十一件事：
 
 1. 罗列 `.coder/` 下的所有文档，`lock.md` 标为 `lock`。
-2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`members/all.md`、`members/flow.md`）里的文档标记为**非法文档**。
+2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`members/all.md`、`members/flow.md`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
 3. 列出所有**缺失**的预期文档；可选文档不存在时不报缺失。
 4. 按 [`docs/design.md`](docs/design.md) 的格式约定诊断每个存在的 Markdown 文档，返回带行号的诊断记录。
 5. 解析两份诊断文档：校验编码前缀与 4 位数字、作用范围、诊断方式、步骤格式、步骤编号、文件通配命中和日志围栏。
-6. 解析四份计划文档：校验编码、字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及 active 与 archived 是否重复。
+6. 解析计划条目文件：校验目录与文件名编码、标题编码是否一致，字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及同一编码是否同时留在 active 与 archived。
 7. 解析 `modules.md` 和存在的 `module-NNNN.md`：校验模块编码、说明、架构/流程/数据结构分段、子模块引用，以及索引与详情文件是否成对。
 8. 解析可选的 `issues/all/issue-NNNN.md`、`open.md` 与 `close.md`：校验详情段落、状态、进度行、关闭原因、编码唯一性、索引与详情文件的对应关系，以及 open 与 close 是否冲突、详情状态与索引是否一致。
 9. 解析可选的 `members/all.md` 与 `members/flow.md`：校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
@@ -85,7 +85,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 默认写入 `dist/.coder/design.html`。`out` 可以指定另一个输出目录，文件名固定为 `design.html`。
 
-页面内嵌十一份预期文档、存在的模块详情和存在的成员文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，`modules.md` 与 `module-NNNN.md` 显示为 Markdown，`members/all.md` 与 `members/flow.md` 显示为 Markdown，`error.md` / `warn.md` 显示为 Markdown 诊断码目录，`plan/` 下的四份文档显示为 Markdown 计划条目，左侧是目录。问题文档属于实施过程记录，不进入页面。页面不显示额外的状态或提示文案。服务端先写入全部被渲染文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
+页面内嵌七份预期文档、存在的计划条目、存在的模块详情和存在的成员文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，`modules.md` 与 `module-NNNN.md` 显示为 Markdown，`members/all.md` 与 `members/flow.md` 显示为 Markdown，`error.md` / `warn.md` 显示为 Markdown 诊断码目录，每个计划条目文件显示为一份 Markdown 计划条目，左侧是目录。问题文档属于实施过程记录，不进入页面。页面不显示额外的状态或提示文案。服务端先写入全部被渲染文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
 
 ## lock / unlock
 
@@ -110,9 +110,9 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 }
 ```
 
-`source` 必须位于项目根目录的 `tmp/` 下，`target` 是 `.coder/` 下的任意文件（`.coder/lock.md` 除外），可以已经存在，也可以缺失。缺失时会创建目标文件和必要的父目录。使用 git 的项目请在 file.md 里用 `# .git/**` 覆盖 git 目录，并用 `# tmp/**` 覆盖暂存目录，否则 `list` 会按未覆盖文件报告。
+`source` 必须位于项目根目录的 `tmp/` 下，`target` 是 `.coder/` 下的任意文件（`.coder/lock.md` 除外），可以已经存在，也可以缺失。缺失时会创建目标文件和必要的父目录。要删除一个已存在的文件时，用 `{ "target": ".coder/plan/todo/T0001.md", "delete": true }`，不需要 `source`；删除同样受 lock hash 与 git 提交保护。使用 git 的项目请在 file.md 里用 `# .git/**` 覆盖 git 目录，并用 `# tmp/**` 覆盖暂存目录，否则 `list` 会按未覆盖文件报告。
 
-未上锁时直接替换，返回「未上锁、update 用于流程变更、不推荐」的提示，不提交。
+未上锁时直接替换或删除，返回「未上锁、update 用于流程变更、不推荐」的提示，不提交。
 
 已上锁时分两步：
 
@@ -145,13 +145,13 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | 内容 | 值 |
 | --- | --- |
 | 文档树目录 | `.coder` |
-| 预期文档 | `design/file.md`、`design/architecture.md`、`design/flow.md`、`design/data_structure.md`、`design/modules.md`、`diagnosis/error.md`、`diagnosis/warn.md`、`plan/todo.md`、`plan/todo-archived.md`、`plan/goal.md`、`plan/goal-archived.md` |
+| 预期文档 | `design/file.md`、`design/architecture.md`、`design/flow.md`、`design/data_structure.md`、`design/modules.md`、`diagnosis/error.md`、`diagnosis/warn.md` |
 | 覆盖范围 | 项目所有文件，`.coder` 自身及其内容除外 |
 | 诊断码 | `error.md` 只允许 `E\d{4}`，`warn.md` 只允许 `W\d{4}` |
-| 计划编码 | todo 文档只允许 `T\d{4}`，goal 文档只允许 `G\d{4}` |
+| 计划编码 | `plan/todo/` 与 `plan/todo/archived/` 只允许 `T\d{4}.md`，`plan/goal/` 与 `plan/goal/archived/` 只允许 `G\d{4}.md`；文件名必须与标题一致 |
 | 模块编码 | `modules.md`、`module-NNNN.md` 与子模块只允许 `\d{4}` |
 | 问题编码 | 问题详情、open.md 与 close.md 只允许 `\d{4}` |
-| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/design/module-NNNN.md`、`.coder/issues/open.md`、`.coder/issues/close.md`、`.coder/issues/all/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`（可选） |
+| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/design/module-NNNN.md`、`.coder/issues/open.md`、`.coder/issues/close.md`、`.coder/issues/all/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
 | 锁 hash | 所有 `.coder` 文件（除 lock.md）内容 sha256 拼接后再 sha256 |
 | 默认渲染输出 | `dist/.coder/design.html` |
 
@@ -164,4 +164,4 @@ npm test
 npm run check
 ```
 
-插件是纯 ESM、零运行时依赖，只使用 Node 内置模块。`list` 的扫描与校验逻辑在 `src/docs.js`，设计文档结构检查在 `src/design.js`，模块索引与详情在 `src/module.js`，问题文档在 `src/issue.js`，成员文档在 `src/member.js`，诊断文档解析在 `src/diagnosis.js`，计划文档解析在 `src/plan.js`，作用范围校验在 `src/scope.js`，Markdown 结构扫描在 `src/markdown.js`，锁格式与 hash 在 `src/lock.js`，HTML 生成在 `src/render.js`，git 操作在 `src/git.js`，工具定义在 `src/tools/`。
+插件是纯 ESM、零运行时依赖，只使用 Node 内置模块。`list` 的扫描与校验逻辑在 `src/docs.js`，设计文档结构检查在 `src/design.js`，模块索引与详情在 `src/module.js`，问题文档在 `src/issue.js`，成员文档在 `src/member.js`，诊断文档解析在 `src/diagnosis.js`，计划条目解析在 `src/plan.js`，作用范围校验在 `src/scope.js`，Markdown 结构扫描在 `src/markdown.js`，锁格式与 hash 在 `src/lock.js`，HTML 生成在 `src/render.js`，git 操作在 `src/git.js`，工具定义在 `src/tools/`。

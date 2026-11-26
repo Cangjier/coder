@@ -68,7 +68,7 @@ export interface DiagnosisCode {
 
 ## 计划条目
 
-计划文档解析出的 todo / goal 条目；`list` 用它展示编码、归档状态、范围、优先级和条目数。
+计划条目文件解析出的 todo / goal 条目；`list` 用它展示编码、归档状态、范围、优先级和条目数。
 
 ```ts
 export type PlanKind = 'todo' | 'goal'
@@ -76,7 +76,7 @@ export type PlanKind = 'todo' | 'goal'
 export type PlanPriority = 'P1' | 'P2' | 'P3'
 
 export interface PlanEntry {
-  /** 展示用文档路径，例如 .coder/plan/todo.md */
+  /** 展示用文档路径，例如 .coder/plan/todo/T0001.md */
   doc: string
   /** 编码标题所在行 */
   line: number
@@ -264,7 +264,7 @@ export interface Report {
   diagnostics: Diagnostic[]
   /** 两份诊断文档解析出的诊断码 */
   diagnoses: DiagnosisCode[]
-  /** 四份计划文档解析出的计划条目 */
+  /** 计划条目文件解析出的计划条目 */
   plans: PlanEntry[]
   /** modules.md 解析出的模块索引 */
   modules: ModuleEntry[]
@@ -282,13 +282,15 @@ export interface Report {
 
 ## 渲染
 
-渲染接收十一份预期文档、存在的模块详情与存在的成员文档的正文，输出页面路径、字节数和当前的检查状态。
+渲染接收七份预期文档、存在的计划条目、存在的模块详情与存在的成员文档的正文，输出页面路径、字节数和当前的检查状态。
 
 ```ts
 export interface RenderDocument {
-  /** 展示用路径，例如 .coder/design/file.md */
+  /** 展示用路径，例如 .coder/design/file.md 或 .coder/plan/todo/T0001.md */
   path: string
   kind: DocumentKind
+  /** 页面内唯一的锚点，计划条目标记为 plan-todo-T0001 这类形式 */
+  id: string
   /** 文档是否存在；缺失时正文为空串 */
   present: boolean
   content: string

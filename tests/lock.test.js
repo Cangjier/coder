@@ -99,11 +99,12 @@ function writeProject(label = 'project') {
   writeFileSync(join(root, '.coder', 'design', 'modules.md'), MODULES_EMPTY)
   writeFileSync(join(root, '.coder', 'diagnosis', 'error.md'), ERROR_OK)
   writeFileSync(join(root, '.coder', 'diagnosis', 'warn.md'), WARN_OK)
-  mkdirSync(join(root, '.coder', 'plan'), { recursive: true })
-  writeFileSync(join(root, '.coder', 'plan', 'todo.md'), PLAN_TODO)
-  writeFileSync(join(root, '.coder', 'plan', 'todo-archived.md'), PLAN_TODO_ARCHIVED)
-  writeFileSync(join(root, '.coder', 'plan', 'goal.md'), PLAN_GOAL)
-  writeFileSync(join(root, '.coder', 'plan', 'goal-archived.md'), PLAN_GOAL_ARCHIVED)
+  mkdirSync(join(root, '.coder', 'plan', 'todo', 'archived'), { recursive: true })
+  mkdirSync(join(root, '.coder', 'plan', 'goal', 'archived'), { recursive: true })
+  writeFileSync(join(root, '.coder', 'plan', 'todo', 'T0001.md'), PLAN_TODO)
+  writeFileSync(join(root, '.coder', 'plan', 'todo', 'archived', 'T0002.md'), PLAN_TODO_ARCHIVED)
+  writeFileSync(join(root, '.coder', 'plan', 'goal', 'G0001.md'), PLAN_GOAL)
+  writeFileSync(join(root, '.coder', 'plan', 'goal', 'archived', 'G0002.md'), PLAN_GOAL_ARCHIVED)
   return root
 }
 

@@ -2,7 +2,7 @@ coder 的设计目标是提供一系列确定性工具，驱动 dsh 实现符合
 
 # DESIGN
 
-设计文档在 `.coder/design/` 下，包括 `file.md`、`architecture.md`、`flow.md`、`data_structure.md`、`modules.md` 和可选的 `module-NNNN.md`；诊断文档在 `.coder/diagnosis/` 下，包括 `error.md` 和 `warn.md`；计划文档在 `.coder/plan/` 下，包括 `todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md`；问题文档在 `.coder/issues/` 下，包括可选的 `all/issue-NNNN.md`、`open.md` 和 `close.md`；成员文档在 `.coder/members/` 下，包括可选的 `all.md` 和 `flow.md`。
+设计文档在 `.coder/design/` 下，包括 `file.md`、`architecture.md`、`flow.md`、`data_structure.md`、`modules.md` 和可选的 `module-NNNN.md`；诊断文档在 `.coder/diagnosis/` 下，包括 `error.md` 和 `warn.md`；计划条目在 `.coder/plan/todo/`、`.coder/plan/todo/archived/`、`.coder/plan/goal/` 和 `.coder/plan/goal/archived/` 下，一项一个文件，文件名就是编码；问题文档在 `.coder/issues/` 下，包括可选的 `all/issue-NNNN.md`、`open.md` 和 `close.md`；成员文档在 `.coder/members/` 下，包括可选的 `all.md` 和 `flow.md`。
 
 ## file.md
 
@@ -151,9 +151,9 @@ console.log({ recorded, current })
 - 诊断文档只用 `#` 写诊断码；作用范围、诊断方式和步骤都写成普通行，第一个诊断码之前不能有正文。
 - 步骤内容是自然语言，`list` 检查格式、编号、通配命中和日志围栏，不执行步骤，也不判断步骤是否足够详细。
 
-## plan/todo.md、goal.md 与归档文档
+## plan/todo/T####.md、plan/goal/G####.md 与 archived
 
-计划文档把待办（todo）和目标（goal）写成编码条目。todo 与 goal 各有一份 active 文档和一份 archived 文档；任务完成后从 active 移到 archived，同一个编码不能同时留在两边。
+计划条目一项一个文件，文件名就是编码：todo 放 `.coder/plan/todo/T0001.md`（进行中）和 `.coder/plan/todo/archived/T0001.md`（已归档）；goal 放 `.coder/plan/goal/G0001.md`（进行中）和 `.coder/plan/goal/archived/G0001.md`（已归档）。文件里只有一个编码标题，字段与编号条目跟在标题后面。
 
 ```md
 # T0001
@@ -164,7 +164,7 @@ console.log({ recorded, current })
 
 完成预期：
 
-1. 如果计划文档缺少字段，则 list 报告 plan.* 诊断，否则通过。
+1. 如果计划文件缺少字段，则 list 报告 plan.* 诊断，否则通过。
 2. 如果编号不连续，则 list 报错，否则通过。
 
 当前进度：
@@ -179,25 +179,27 @@ console.log({ recorded, current })
 
 完成预期：
 
-1. 如果计划文档无法由 list 机械校验，则视为未达成，否则通过。
+1. 如果计划文件无法由 list 机械校验，则视为未达成，否则通过。
 
 关联ToDo：
 
 1. T0001
 ```
 
-- `todo.md` / `todo-archived.md` 只放 `T` 开头的编码，`goal.md` / `goal-archived.md` 只放 `G` 开头的编码；数字部分固定 4 位。
+- `plan/todo/` 与 `plan/todo/archived/` 只放 `T` 开头的编码，`plan/goal/` 与 `plan/goal/archived/` 只放 `G` 开头的编码；数字部分固定 4 位。
+- 文件名决定编码与归档状态；文件里的 `# T0001` / `# G0001` 标题必须与文件名一致，否则报 `plan.file.code`。
+- 计划条目文件是可选的：没有 `plan/` 目录或目录为空表示当前没有待办或归档记录，不报缺失。
+- 任务完成后把条目移到 `archived/` 目录；同一个编码不能同时出现在 active 与 archived 目录，否则报 `plan.code.archived-duplicate`。
 - `任务范围` 只能是 `全局`，或相对于项目根目录的文件路径通配；通配写法与 `file.md` 相同。
 - todo 的字段顺序是 `任务范围 → 优先级 → 完成预期 → 当前进度`；goal 是 `任务范围 → 完成预期 → 关联ToDo`。
 - `优先级` 只能是 `P1`、`P2` 或 `P3`。
 - todo 的 `完成预期`、`当前进度` 和 goal 的 `完成预期`、`关联ToDo` 下面的条目从 `1.` 开始连续编号。
 - 完成预期写成 `如果 ... 则 ...，否则 ...`；当前进度写成 `[文件路径通配] 说明`。
 - `关联ToDo` 的条目是 `T` 加 4 位数字。
-- 计划文档只用 `#` 写编码；字段和条目都写成普通行。
-- 空计划文档合法，表示当前没有待办或没有归档记录。
-- `list` 检查编码、字段顺序与重复、编号、句式、进度里的文件通配和关联 ToDo 格式；任务是否真的完成、进度描述是否属实无法机械判断。
-- 同一个编码同时出现在 active 与 archived 文档时报 `plan.code.archived-duplicate`。
-- 归档时用 `update` 替换 active 与 archived 文档，把完成条目从 active 移入 archived。
+- 计划文件只用一个 `#` 标题写编码；字段和条目都写成普通行，第二个 `#` 标题报 `plan.code.multiple`。
+- 空计划文件报 `plan.no-code`；计划文件必须从编码标题开始。
+- `list` 检查文件名与编码、字段顺序与重复、编号、句式、进度里的文件通配和关联 ToDo 格式；任务是否真的完成、进度描述是否属实无法机械判断。
+- 归档时用 `update` 写入 `archived/` 下的新文件，再用 `{ "target": "...", "delete": true }` 删除 active 文件。
 
 ## issues/all/issue-NNNN.md、open.md 与 close.md
 
@@ -288,7 +290,7 @@ console.log({ recorded, current })
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md` 和 `members/flow.md` 是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo.md`、`todo-archived.md`、`goal.md` 和 `goal-archived.md` 会检查编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文档会检查详情段落、状态、进度行、关闭原因、编码唯一性，以及 open.md 与 close.md 是否冲突、索引是否指向存在的详情文件。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open.md`、`issues/close.md`、`issues/all/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文档会检查详情段落、状态、进度行、关闭原因、编码唯一性，以及 open.md 与 close.md 是否冲突、索引是否指向存在的详情文件。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
 ### 预期文档
 
@@ -301,12 +303,8 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 | `.coder/design/modules.md` | 模块索引 |
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
-| `.coder/plan/todo.md` | T 开头的进行中待办 |
-| `.coder/plan/todo-archived.md` | T 开头的已归档待办 |
-| `.coder/plan/goal.md` | G 开头的进行中目标 |
-| `.coder/plan/goal-archived.md` | G 开头的已归档目标 |
 
-`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。`.coder/issues/open.md`、`.coder/issues/close.md`、`.coder/issues/all/issue-NNNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md` 和 `.coder/members/flow.md` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
+`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open.md`、`.coder/issues/close.md`、`.coder/issues/all/issue-NNNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md` 和 `.coder/members/flow.md` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
 
 ### 格式约定
 
@@ -375,11 +373,13 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - 作用范围、诊断方式和每个步骤之间空一行，Markdown 才会逐行显示。
 - 步骤内容是自然语言，`list` 只检查格式、编号、通配命中和日志围栏，不执行步骤，也不判断步骤是否足够详细。
 
-#### plan/todo.md、goal.md 与归档文档
+#### plan/todo/T####.md、plan/goal/G####.md 与 archived
 
-- 文档由一级标题的编码组成，例如 `# T0001` / `# G0001`；todo 文档只允许 `T\d{4}`，goal 文档只允许 `G\d{4}`。
-- 同一份文档里编码不能重复；同一个编码同时出现在 active 与 archived 文档时报 `plan.code.archived-duplicate`。
-- 每个编码必须包含规定字段，字段顺序固定且不能重复：
+- 每个文件一个条目，文件名是 `T####.md` 或 `G####.md`；todo 目录只允许 `T\d{4}.md`，goal 目录只允许 `G\d{4}.md`，数字部分固定 4 位。
+- 文件里只有一个一级标题 `# T0001` / `# G0001`，且必须与文件名一致；文件名与标题不一致报 `plan.file.code`。
+- 同一份文件里出现第二个一级标题报 `plan.code.multiple`；`##` 标题报 `plan.heading.level`，其他正文行报 `plan.body`。
+- 第一个编码标题之前不能有正文；空文件报 `plan.no-code`。
+- 每个文件必须包含规定字段，字段顺序固定且不能重复：
   - todo：`任务范围`、`优先级`、`完成预期`、`当前进度`；
   - goal：`任务范围`、`完成预期`、`关联ToDo`。
 - `任务范围` 必须是 `全局` 或合法的文件路径通配。
@@ -387,10 +387,8 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - todo 的 `完成预期` 和 `当前进度` 至少各有一个条目；goal 的 `完成预期` 和 `关联ToDo` 至少各有一个条目；条目从 `1.` 开始连续编号。
 - 完成预期必须匹配 `如果 ... 则 ...，否则 ...`；当前进度必须匹配 `[文件通配] 说明`。
 - `关联ToDo` 至少有一个条目，每个条目是 `T` 加 4 位数字。
-- 计划文档只用 `#` 写编码；`##` 标题报 `plan.heading.level`，其他正文行报 `plan.body`。
-- 第一个编码之前不能有正文；编码之间可以空行。
-- 空计划文档合法。
-- 计划文档的字段之间空一行，Markdown 才会逐行显示。
+- 字段之间空一行，Markdown 才会逐行显示。
+- 没有计划文件时不报缺失；`plan/` 目录下不符合命名规则的文件是非法文档。
 
 #### issues/all/issue-NNNN.md、open.md 与 close.md
 
@@ -440,17 +438,17 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `diagnostics`：每条诊断包含 `doc`、`line`（能定位时）、`rule` 与 `message`。
 - `diagnoses`：两份诊断文档里解析出的诊断码，包含 `code`、`severity`、`scope`、`scopeKind`、`method`、`steps`、`matches`。
 - `summary.codes`：解析出的诊断码数量。
-- `plans`：四份计划文档里解析出的条目，包含 `code`、`kind`、`archived`、`scope`、`priority`、`expected`、`progress`、`todos`。
+- `plans`：计划条目文件里解析出的条目，包含 `code`、`kind`、`archived`、`scope`、`priority`、`expected`、`progress`、`todos`。
 - `summary.plans`：解析出的计划条目数量。
 - `ok`：没有非法文档、没有缺失文档、也没有任何诊断时为 `true`。
 
 ## render
 
-`render` 把 `.coder/` 的十一份预期文档、存在的模块详情和存在的成员文档渲染成一个 `design.html`。
+`render` 把 `.coder/` 的七份预期文档、存在的计划条目、存在的模块详情和存在的成员文档渲染成一个 `design.html`。
 
 - 默认输出目录：`dist/.coder/`；文件名固定 `design.html`。
 - 调用参数 `out` 可以指定另一个输出目录。
-- 页面内嵌十一份预期文档、`design/module-NNNN.md` 和存在的 `members/all.md` / `members/flow.md`；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，modules.md 与模块详情渲染为 Markdown，成员文档渲染为 Markdown，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，plan 下的四份文档渲染为 Markdown 计划条目，左侧是目录。
+- 页面内嵌七份预期文档、存在的计划条目文件、`design/module-NNNN.md` 和存在的 `members/all.md` / `members/flow.md`；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，modules.md 与模块详情渲染为 Markdown，成员文档渲染为 Markdown，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，每个计划条目文件渲染为一份 Markdown 计划条目，左侧是目录。
 - 问题文档属于实施过程记录，不进入渲染页面；成员文档存在时进入页面，不存在时页面不显示空区块。
 - 页面不显示额外的状态或提示文案。
 - 页面在服务端预置全部被渲染文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
@@ -478,19 +476,20 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 
 ## update
 
-`update` 用 `tmp/` 下的源文件替换 `.coder/` 下的文档。
+`update` 用 `tmp/` 下的源文件替换 `.coder/` 下的文档，或删除 `.coder/` 下不再需要的文档。
 
-输入 `updates` 是非空数组，每项 `{ source, target }`：
+输入 `updates` 是非空数组，每项 `{ source, target }` 或 `{ target, delete: true }`：
 
-- `source` 必须位于项目根目录的 `tmp/` 下，是普通文件，使用 `/` 分隔。
+- `source` 必须位于项目根目录的 `tmp/` 下，是普通文件，使用 `/` 分隔；`delete: true` 的项不需要 `source`。
 - 使用 git 的项目在 file.md 中用 `# .git/**` 覆盖 git 目录，用 `# tmp/**` 覆盖暂存目录，避免覆盖检查把这些文件报成未描述。
-- `target` 是 `.coder/` 下的任意文件，例如 `.coder/design/flow.md`、`.coder/diagnosis/error.md` 或 `.coder/plan/todo.md`；`.coder/lock.md` 由工具维护，不能作为 target。
-- `target` 可以已经存在，也可以缺失；缺失时创建它和必要的父目录。已存在时必须是普通文件。
+- `target` 是 `.coder/` 下的任意文件，例如 `.coder/design/flow.md`、`.coder/diagnosis/error.md` 或 `.coder/plan/todo/T0001.md`；`.coder/lock.md` 由工具维护，不能作为 target。
+- 替换项的 `target` 可以已经存在，也可以缺失；缺失时创建它和必要的父目录。已存在时必须是普通文件。
+- 删除项的 `target` 必须已经存在且是普通文件；删除后父目录保留。
 - 同一目标只能出现一次。
 
 ### 未上锁
 
-直接按源文件内容替换目标文件，返回 `locked:false` 和「未上锁、update 用于流程变更、不推荐」的提示。不提交 git，不生成 key。
+直接按源文件内容替换目标文件、删除删除项的目标文件，返回 `locked:false` 和「未上锁、update 用于流程变更、不推荐」的提示。不提交 git，不生成 key。
 
 ### 已上锁
 
@@ -507,9 +506,9 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `branch` 是新建分支名，`adjustment` 时必填，且必须是不存在、合法的 git 分支名；`supplement` 不新建分支，不需要 `branch`。
 - `review` 是本次更新的用户授权原文，必须非空；工具只能校验它存在，无法验证来源，锁的授权原文仍保存在 lock.md 第三行。
 - 再次检查 lock hash，并核对 updates 的 source/target/源文件 hash 与第一次一致；任何变化直接报错。每一次 update 调用都会检查 hash。
-- 替换目标文件，重新计算 lock hash 并写回 lock.md。
-- `supplement`：在当前分支提交目标文件与 lock.md。
-- `adjustment`：先把当前工作区提交为 checkpoint，按传入的 `branch` 新建分支，再替换、更新 hash 并提交。
+- 替换或删除目标文件，重新计算 lock hash 并写回 lock.md。
+- `supplement`：在当前分支提交目标文件（含删除）与 lock.md。
+- `adjustment`：先把当前工作区提交为 checkpoint，按传入的 `branch` 新建分支，再替换、删除、更新 hash 并提交。
 - 不 push；不做复杂回滚，git 和 dsh 的 fs 沙盒是保底。
 
 ## create_issue

@@ -16,8 +16,8 @@
  *
  *   unlock  删除 `.coder/lock.md`。
  *
- *   update  用 `tmp/` 下的源文件替换 `.coder` 下的任意文档；上锁时分两步，
- *           要求子代理审查后带 key、decision、review 再次调用。
+ *   update  用 `tmp/` 下的源文件替换 `.coder` 下的任意文档，或删除不再需要的
+ *           文档；上锁时分两步，要求子代理审查后带 key、decision、review 再次调用。
  *
  *   create_issue  在 `.coder/issues/all/` 下新建问题详情，并登记到 open.md 或
  *                 close.md；`.coder` 上锁时拒绝直接写入。

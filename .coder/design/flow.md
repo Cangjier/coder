@@ -37,13 +37,13 @@ flowchart TD
   J --> K
   K --> L[写入 diagnoses]
 ```
-## 检查计划文档
-在 list 时解析 todo / goal 与归档文档，校验编码、字段顺序、编号条目、完成预期、当前进度和关联 ToDo；同一个编码不能同时留在 active 与 archived。
+## 检查计划条目
+在 list 时解析 plan/todo 与 plan/goal 下的单条目文件（含 archived），校验文件名编码与标题一致、目录前缀、字段顺序、编号条目、完成预期、当前进度和关联 ToDo；同一个编码不能同时留在 active 与 archived。
 
 ```mermaid
 flowchart TD
-  A[读取 plan 文档] --> B[按 # 分段解析编码]
-  B --> C[校验 T/G 前缀与 4 位数字]
+  A[读取 plan/todo 与 plan/goal 下的单条目文件] --> B[校验文件名编码与 # 标题一致]
+  B --> C[校验目录前缀与 4 位数字]
   C --> D[校验字段顺序与编号]
   D --> E[校验完成预期、进度通配与关联 ToDo]
   E --> F{active 与 archived 重复?}
@@ -159,7 +159,7 @@ flowchart TD
   G -- 调整 --> I[checkpoint + 按 branch 新建分支 + 提交]
 ```
 ## 渲染文档
-把十一份预期文档、存在的模块详情和存在的成员文档渲染成一个 HTML 页面。
+把七份预期文档、存在的计划条目、存在的模块详情和存在的成员文档渲染成一个 HTML 页面。
 
 ```mermaid
 flowchart LR
