@@ -79,6 +79,21 @@ flowchart TD
   F -- 否 --> H[写入 issues]
 ```
 
+## 提示大文件拆分
+list 读取可选的 .coder/manifest.json 取阈值（默认 20KB），只统计源码扩展名并跳过依赖与产物目录；超过阈值的文件写入提示段，不改变 ok。
+
+```mermaid
+flowchart TD
+  A[读取 .coder/manifest.json] --> B{JSON 合法?}
+  B -- 否 --> C[报 manifest.* 诊断并使用默认值]
+  B -- 是 --> D[取 largeCodeFileBytes]
+  C --> D
+  D --> E[遍历项目源码文件]
+  E --> F{大小超过阈值?}
+  F -- 是 --> G[写入 hints]
+  F -- 否 --> H[跳过]
+```
+
 ## 检查成员文档
 成员文档都是可选的；存在时解析 members/all.md 的主对话与成员字段（成员的备注可选），members/flow.md 沿用场景和 Mermaid 规则。
 

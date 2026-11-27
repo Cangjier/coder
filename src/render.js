@@ -11,7 +11,6 @@
  * - modules.md 与 module-NNNN.md 渲染成 Markdown；
  * - members/all.md 与 members/flow.md 存在时渲染成 Markdown；
  * - diagnosis/error.md 与 warn.md 渲染成 Markdown 诊断码目录；
- * - .coder/plan/todo 与 plan/goal 下的计划条目文件（含 archived/）各渲染成一份 Markdown 计划条目；
  * - 不显示状态卡、页脚、说明文案或回退提示。
  *
  * Markdown 由 `marked` 渲染，Mermaid 由 `mermaid` 渲染，两者从 jsDelivr
@@ -27,7 +26,6 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
 import { CoderError, DOCS_DIR, EXPECTED_DOCS, inspectDocs, kindOf } from './docs.js'
-import { planMetaOf } from './plan.js'
 
 /** 默认输出目录，相对于项目根目录。 */
 export const DEFAULT_OUT_DIR = 'dist/.coder'
@@ -65,7 +63,7 @@ function renderFallbackSections(docs) {
     const body = doc.present
       ? `<div class="markdown doc-fallback"><pre>${escapeHtml(doc.content)}</pre></div>`
       : '<div class="doc-missing"></div>'
-    return `<section class="doc" id="${escapeHtml(doc.id)}" data-doc="${escapeHtml(doc.id)}">
+    return `<section class="doc" id="${escapeHtml(doc.kind)}" data-doc="${escapeHtml(doc.kind)}">
   <h2>${escapeHtml(doc.path)}</h2>
   ${body}
 </section>`
@@ -75,12 +73,12 @@ function renderFallbackSections(docs) {
 /**
  * 服务端预置的目录，列出全部被渲染文档；前端会在此基础上补文档内标题。
  *
- * @param {{path: string, id: string}[]} docs - 全部被渲染文档。
+ * @param {{path: string, kind: string}[]} docs - 全部被渲染文档。
  * @returns {string} 目录的 HTML。
  */
 function renderStaticNav(docs) {
   const items = docs
-    .map((doc) => `    <li><a href="#${escapeHtml(doc.id)}">${escapeHtml(doc.path)}</a></li>`)
+    .map((doc) => `    <li><a href="#${escapeHtml(doc.kind)}">${escapeHtml(doc.path)}</a></li>`)
     .join('\n')
   return `<ul class="toc">\n${items}\n  </ul>`
 }
@@ -89,7 +87,7 @@ function renderStaticNav(docs) {
  * 构造单页 HTML。
  *
  * @param {object} input - 输入。
- * @param {{path: string, kind: string, id: string, present: boolean, content: string}[]} input.docs - 全部被渲染文档。
+ * @param {{path: string, kind: string, present: boolean, content: string}[]} input.docs - 全部被渲染文档。
  * @returns {string} HTML 文本。
  */
 function buildHtml({ docs }) {
@@ -97,7 +95,6 @@ function buildHtml({ docs }) {
     docs: docs.map((doc) => ({
       path: doc.path,
       kind: doc.kind,
-      id: doc.id,
       present: doc.present,
       content: doc.content,
     })),
@@ -550,7 +547,7 @@ ${renderFallbackSections(docs)}
   }
 
   data.docs.forEach(function (doc) {
-    var section = document.getElementById(doc.id)
+    var section = document.getElementById(doc.kind)
     if (section === null || !doc.present) return
     var fallback = section.querySelector('.doc-fallback')
     if (doc.kind === 'file') {
@@ -564,8 +561,7 @@ ${renderFallbackSections(docs)}
     body.className = 'markdown'
     try {
       var diagnosis = doc.kind === 'diagnosis-error' || doc.kind === 'diagnosis-warn'
-      var plan = doc.kind.indexOf('plan-') === 0
-      body.innerHTML = window.marked.parse(doc.content, { gfm: true, breaks: diagnosis || plan })
+      body.innerHTML = window.marked.parse(doc.content, { gfm: true, breaks: diagnosis })
     } catch (error) {
       return
     }
@@ -608,16 +604,16 @@ ${renderFallbackSections(docs)}
   data.docs.forEach(function (doc) {
     var item = document.createElement('li')
     var link = document.createElement('a')
-    bindJump(link, doc.id)
+    bindJump(link, doc.kind)
     link.textContent = doc.path
     item.appendChild(link)
-    var section = document.getElementById(doc.id)
+    var section = document.getElementById(doc.kind)
     if (section !== null) {
       var headings = section.querySelectorAll('.markdown h1, .markdown h2')
       if (headings.length > 0) {
         var sublist = document.createElement('ul')
         Array.prototype.forEach.call(headings, function (heading, index) {
-          heading.id = doc.id + '-h-' + index
+          heading.id = doc.kind + '-h-' + index
           var subItem = document.createElement('li')
           var subLink = document.createElement('a')
           bindJump(subLink, heading.id)
@@ -657,7 +653,10 @@ ${renderFallbackSections(docs)}
 }
 
 /**
- * 渲染 `.coder/` 的预期文档、计划条目文件、模块详情与成员文档到 `design.html`。
+ * 渲染 `.coder/` 的预期文档、模块详情与成员文档到 `design.html`。
+ *
+ * 计划条目文件（todo / goal）与问题文件不进入页面：它们数量多，适合用
+ * `list` 查看。
  *
  * @param {object} options - 选项。
  * @param {string} options.root - 项目根目录。
@@ -682,21 +681,11 @@ export async function renderDesign({ root, outDir }) {
     )
     .map((document) => document.relative)
     .sort((a, b) => a.localeCompare(b))
-  const planRank = (relative) => {
-    const meta = planMetaOf(relative)
-    if (meta === null) return 99
-    return (meta.type === 'todo' ? 0 : 2) + (meta.archived ? 1 : 0)
-  }
-  const planDocs = report.documents
-    .filter((document) => document.status === 'optional' && document.kind.startsWith('plan-'))
-    .map((document) => document.relative)
-    .sort((a, b) => planRank(a) - planRank(b) || a.localeCompare(b))
   const relatives = []
   for (const relative of EXPECTED_DOCS) {
     relatives.push(relative)
     if (relative === 'design/modules.md') relatives.push(...moduleDocs)
   }
-  relatives.push(...planDocs)
   relatives.push(...memberDocs)
 
   for (const relative of relatives) {
@@ -712,15 +701,7 @@ export async function renderDesign({ root, outDir }) {
         throw new CoderError(`无法读取 ${absolute}：${error instanceof Error ? error.message : String(error)}`)
       }
     }
-    const kind = kindOf(relative)
-    const meta = planMetaOf(relative)
-    docs.push({
-      path: `${DOCS_DIR}/${relative}`,
-      kind,
-      id: meta === null ? kind : `${kind}-${meta.code}`,
-      present,
-      content,
-    })
+    docs.push({ path: `${DOCS_DIR}/${relative}`, kind: kindOf(relative), present, content })
   }
 
   let targetDir
@@ -756,7 +737,7 @@ export async function renderDesign({ root, outDir }) {
       `已生成 ${OUTPUT_FILE}`,
       `输出：${output}`,
       `大小：${bytes} 字节`,
-      `文档：${report.summary.found}/${report.summary.expected}｜模块 ${report.summary.modules}｜成员 ${memberDocs.length}｜问题 ${report.summary.issues}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}`,
+      `文档：${report.summary.found}/${report.summary.expected}｜模块 ${report.summary.modules}｜成员 ${memberDocs.length}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}`,
       '在浏览器中打开即可查看；Markdown 与 Mermaid 由 jsDelivr 上的 marked/mermaid 渲染，离线时回退为源码。',
     ].join('\n'),
   }

@@ -256,9 +256,13 @@ describe('list 与计划文档', () => {
     assert.equal(report.summary.expected, 7)
     assert.equal(report.summary.plans, 4)
     assert.equal(report.plans.length, 4)
-    assert.match(report.text, /计划：/)
-    assert.match(report.text, /T0001 \[进行中\] todo｜P1｜src\/\*\*｜完成预期 2｜进度 1/)
-    assert.match(report.text, /G0002 \[归档\] goal｜src\/\*\*｜完成预期 1｜关联 ToDo 1/)
+    assert.match(report.text, /计划 4/)
+    assert.doesNotMatch(report.text, /计划：/)
+    assert.doesNotMatch(report.text, /T0001 \[进行中\]/)
+    assert.deepEqual(
+      report.plans.map((entry) => `${entry.code}:${entry.archived ? '归档' : '进行中'}`),
+      ['T0001:进行中', 'T0002:归档', 'G0001:进行中', 'G0002:归档'],
+    )
   })
 
   it('没有 active 计划文件时仍然合法', async () => {
@@ -270,7 +274,8 @@ describe('list 与计划文档', () => {
     })
     assert.equal(report.ok, true)
     assert.equal(report.summary.plans, 2)
-    assert.match(report.text, /T0002 \[归档\]/)
+    assert.match(report.text, /计划 2/)
+    assert.doesNotMatch(report.text, /T0002 \[归档\]/)
   })
 
   it('同一编码同时留在 active 与 archived 目录时报错', async () => {

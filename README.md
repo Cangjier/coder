@@ -15,7 +15,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 ## .coder 文档树
 
-项目根目录下的 `.coder/` 按约定维护五份设计文档和两份诊断文档，并可选维护计划条目文件、模块详情、成员文档与问题文档：
+项目根目录下的 `.coder/` 按约定维护五份设计文档和两份诊断文档，并可选维护计划条目文件、模块详情、成员文档、问题文件与 `manifest.json` 配置：
 
 | 文档 | 作用 |
 | --- | --- |
@@ -31,6 +31,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | `.coder/plan/todo/archived/T0001.md` | T 开头的已归档待办（可选） |
 | `.coder/plan/goal/G0001.md` | G 开头的进行中目标，一项一个文件（可选） |
 | `.coder/plan/goal/archived/G0001.md` | G 开头的已归档目标（可选） |
+| `.coder/manifest.json` | 可选配置：大代码文件阈值 `largeCodeFileBytes`（可选） |
 | `.coder/issues/open/issue-NNNN.md` | 开启的问题，一个问题一个文件（可选） |
 | `.coder/issues/close/issue-NNNN.md` | 关闭的问题，一个问题一个文件（可选） |
 | `.coder/members/all.md` | 主对话与成员的身份、工作范围，成员的备注（可选） |
@@ -54,10 +55,10 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 ## list
 
-`list` 每次调用做十一件事：
+`list` 每次调用做十二件事：
 
 1. 罗列 `.coder/` 下的所有文档，`lock.md` 标为 `lock`。
-2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`members/all.md`、`members/flow.md`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
+2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
 3. 列出所有**缺失**的预期文档；可选文档不存在时不报缺失。
 4. 按 [`docs/design.md`](docs/design.md) 的格式约定诊断每个存在的 Markdown 文档，返回带行号的诊断记录。
 5. 解析两份诊断文档：校验编码前缀与 4 位数字、作用范围、诊断方式、步骤格式、步骤编号、文件通配命中和日志围栏。
@@ -66,9 +67,10 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 8. 解析可选的 `issues/open/issue-NNNN.md` 与 `issues/close/issue-NNNN.md`：校验文件名编码、段落顺序、当前进度、关闭原因，以及同一编码是否同时出现在 open/ 与 close/。
 9. 解析可选的 `members/all.md` 与 `members/flow.md`：校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
 10. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`file.md` 中出现 `.coder` 会报错。
-11. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+11. 读取可选的 `.coder/manifest.json`（默认 `largeCodeFileBytes = 20480`），对超过阈值的源码文件生成拆分提示；提示写入 `hints` 与 text 的「提示：」段，不影响 `ok`。
+12. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
-诊断码的作用范围是文件通配时，以及步骤里的文件通配，都要求至少命中一个项目文件；步骤内容是自然语言，`list` 只检查格式，不执行它们。
+诊断码的作用范围是文件通配时，以及步骤里的文件通配，都要求至少命中一个项目文件；步骤内容是自然语言，`list` 只检查格式，不执行它们。text 只打印计划与问题的数量，不逐条打印；结构化结果仍包含完整的 `plans` 与 `issues`。大文件提示只统计源码扩展名，跳过 `.git`、`node_modules`、`dist`、`build`、`out`、`target`、`vendor`、`coverage`、`tmp` 等目录。
 
 ```json
 { "root": "/path/to/project" }
@@ -84,7 +86,20 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 默认写入 `dist/.coder/design.html`。`out` 可以指定另一个输出目录，文件名固定为 `design.html`。
 
-页面内嵌七份预期文档、存在的计划条目、存在的模块详情和存在的成员文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，`modules.md` 与 `module-NNNN.md` 显示为 Markdown，`members/all.md` 与 `members/flow.md` 显示为 Markdown，`error.md` / `warn.md` 显示为 Markdown 诊断码目录，每个计划条目文件显示为一份 Markdown 计划条目，左侧是目录。问题文档属于实施过程记录，不进入页面。页面不显示额外的状态或提示文案。服务端先写入全部被渲染文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
+页面内嵌七份预期文档、存在的模块详情和存在的成员文档：`file.md` 显示为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；`architecture.md` 和 `flow.md` 显示为 Markdown 与 Mermaid 图，`data_structure.md` 显示为 Markdown 与 TypeScript 代码块，`modules.md` 与 `module-NNNN.md` 显示为 Markdown，`members/all.md` 与 `members/flow.md` 显示为 Markdown，`error.md` / `warn.md` 显示为 Markdown 诊断码目录，左侧是目录。计划条目与问题文件不进入页面。页面不显示额外的状态或提示文案。服务端先写入全部被渲染文档的源码，脚本不可用时它就是可读正文；脚本可用时前端升级为树表格 / Markdown / Mermaid。Markdown 用 marked 渲染，Mermaid 图用 mermaid 渲染，两者从 jsDelivr 加载。
+
+## manifest.json
+
+`.coder/manifest.json` 是可选的配置，空文件等同默认值：
+
+```json
+{ "largeCodeFileBytes": 20480 }
+```
+
+- `largeCodeFileBytes` 是正整数，单位字节，默认 `20480`（20KB）。
+- 源码文件超过阈值时，`list` 在「提示：」段列出文件、大小与阈值，建议拆分；提示不进入 diagnostics，`ok` 不受影响。
+- JSON 不合法、顶层不是对象、出现未知键或值不是正整数时分别报 `manifest.invalid`、`manifest.unknown`、`manifest.value`。
+- `render` 不渲染 manifest.json。
 
 ## lock / unlock
 
@@ -150,11 +165,12 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | 计划编码 | `plan/todo/` 与 `plan/todo/archived/` 只允许 `T\d{4}.md`，`plan/goal/` 与 `plan/goal/archived/` 只允许 `G\d{4}.md`；文件名必须与标题一致 |
 | 模块编码 | `modules.md`、`module-NNNN.md` 与子模块只允许 `\d{4}` |
 | 问题编码 | `issues/open/` 与 `issues/close/` 下只允许 `issue-\d{4}.md`，状态由文件夹决定 |
-| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/design/module-NNNN.md`、`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
+| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/manifest.json`、`.coder/design/module-NNNN.md`、`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
+| 大文件提示 | 默认 `largeCodeFileBytes = 20480`；`.coder/manifest.json` 可覆盖；提示不影响 `ok` |
 | 锁 hash | 所有 `.coder` 文件（除 lock.md）内容 sha256 拼接后再 sha256 |
 | 默认渲染输出 | `dist/.coder/design.html` |
 
-调用参数 `root` / `out` 只表示这次操作的位置，不是配置项。
+调用参数 `root` / `out` 只表示这次操作的位置；唯一可配置项是 `.coder/manifest.json` 里的 `largeCodeFileBytes`。
 
 ## 开发
 

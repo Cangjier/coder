@@ -57,6 +57,35 @@ export const EXPECTED_DOCS = Object.freeze([
 /** 会被当作 Markdown 诊断的扩展名。 */
 const MARKDOWN_EXTENSION = /\.(md|markdown)$/i
 
+/** 可选配置文件，相对于 `.coder/`。 */
+export const MANIFEST_DOC = 'manifest.json'
+
+/** 大代码文件的默认阈值（字节）。 */
+export const DEFAULT_LARGE_CODE_FILE_BYTES = 20 * 1024
+
+/** 计入大文件提示的源码扩展名。 */
+const CODE_FILE_EXTENSION = /\.(?:js|mjs|cjs|jsx|ts|tsx|py|go|rs|java|kt|kts|c|h|cc|cpp|cxx|hpp|hxx|cs|swift|rb|php|scala|sh|bash|zsh|ps1|lua|pl|pm|r|ex|exs|erl|hs|ml|clj|cljs|dart|vue|svelte|html|css|scss|sass|less)$/i
+
+/** 大文件提示跳过的目录名；`node_modules` 在任意层级都跳过。 */
+const HINT_SKIP_DIRS = Object.freeze(
+  new Set([
+    '.git',
+    'node_modules',
+    'dist',
+    'build',
+    'out',
+    'target',
+    'vendor',
+    'coverage',
+    'tmp',
+    '.cache',
+    '.next',
+    '.nuxt',
+    '.output',
+    'artifacts',
+  ]),
+)
+
 /** 反向表述：行首这些词说明「只描述正向预期」被破坏了。 */
 const NEGATION_START = /^(不要|禁止|不允许|不得|不能|勿|请勿|严禁|do not|don't|must not|never)/i
 
@@ -111,6 +140,7 @@ export function kindOf(relative) {
  */
 export function isOptionalDoc(relative) {
   return (
+    relative === MANIFEST_DOC ||
     planKindOf(relative) !== null ||
     isOptionalModuleDoc(relative) ||
     isIssueDoc(relative) ||
@@ -455,6 +485,93 @@ async function walkProject(root) {
 }
 
 /**
+ * 解析可选的 `.coder/manifest.json`。
+ *
+ * 空文件等同默认配置。目前只支持一个键：`largeCodeFileBytes`（正整数，单位
+ * 字节）。JSON 不合法、类型不对或出现未知键都会变成诊断，让配置错误暴露出来。
+ *
+ * @param {string} text - 文件正文。
+ * @returns {{threshold: number, diagnostics: object[]}} 阈值与诊断。
+ */
+export function parseManifest(text) {
+  const doc = `${DOCS_DIR}/${MANIFEST_DOC}`
+  const diagnostics = []
+  let threshold = DEFAULT_LARGE_CODE_FILE_BYTES
+  if (text.trim() === '') return { threshold, diagnostics }
+
+  let value
+  try {
+    value = JSON.parse(text)
+  } catch (error) {
+    diagnostics.push(
+      diagnostic(
+        doc,
+        1,
+        'manifest.invalid',
+        `无法解析 JSON：${error instanceof Error ? error.message : String(error)}`,
+      ),
+    )
+    return { threshold, diagnostics }
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    diagnostics.push(diagnostic(doc, 1, 'manifest.invalid', 'manifest.json 必须是 JSON 对象。'))
+    return { threshold, diagnostics }
+  }
+
+  for (const key of Object.keys(value)) {
+    if (key !== 'largeCodeFileBytes') {
+      diagnostics.push(
+        diagnostic(doc, 1, 'manifest.unknown', `不支持的配置项：${key}；目前只支持 largeCodeFileBytes。`),
+      )
+    }
+  }
+
+  if (Object.hasOwn(value, 'largeCodeFileBytes')) {
+    const bytes = value.largeCodeFileBytes
+    if (!Number.isInteger(bytes) || bytes <= 0) {
+      diagnostics.push(
+        diagnostic(
+          doc,
+          1,
+          'manifest.value',
+          `largeCodeFileBytes 必须是正整数（字节）；收到：${JSON.stringify(bytes)}。`,
+        ),
+      )
+    } else {
+      threshold = bytes
+    }
+  }
+
+  return { threshold, diagnostics }
+}
+
+/**
+ * 收集超过阈值的大代码文件，供 `list` 提示拆分。
+ *
+ * 只统计源码扩展名；`.git`、`node_modules`、`dist`、`build`、`tmp` 等依赖和
+ * 产物目录跳过，避免把依赖里的源码也算进来。
+ *
+ * @param {string} root - 项目根目录。
+ * @param {string[]} files - 项目文件，相对路径。
+ * @param {number} threshold - 阈值（字节）。
+ * @returns {Promise<{path: string, bytes: number, threshold: number}[]>} 按大小降序的提示。
+ */
+export async function collectLargeFileHints(root, files, threshold) {
+  const hints = []
+  for (const relative of files) {
+    if (!CODE_FILE_EXTENSION.test(relative)) continue
+    const segments = relative.split('/')
+    if (segments.includes('node_modules') || HINT_SKIP_DIRS.has(segments[0])) continue
+    const absolute = path.join(root, ...segments)
+    const stat = await fs.stat(absolute).catch(() => null)
+    if (stat === null || !stat.isFile() || stat.size <= threshold) continue
+    hints.push({ path: relative, bytes: stat.size, threshold })
+  }
+  hints.sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path))
+  return hints
+}
+
+/**
  * 拼一个展示用路径。
  *
  * @param {string} relative - 相对路径；空串表示文档树根。
@@ -474,7 +591,7 @@ function formatReport(report) {
   const lines = [`Coder 文档检查：${report.docsRoot}`]
   if (!report.docsRootExists) lines.push(`（${DOCS_DIR}/ 不存在。）`)
   lines.push(
-    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}｜模块 ${report.summary.modules}｜问题 ${report.summary.issues}${report.summary.locked ? '｜已上锁' : ''}`,
+    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}｜模块 ${report.summary.modules}｜问题 ${report.summary.issues}${report.summary.hints > 0 ? `｜提示 ${report.summary.hints}` : ''}${report.summary.locked ? '｜已上锁' : ''}`,
   )
   lines.push('')
   lines.push('文档：')
@@ -505,18 +622,6 @@ function formatReport(report) {
       lines.push(`  ${item.code} [${item.severity}] ${scope}｜诊断方式 ${method}｜步骤 ${item.steps.length}`)
     }
   }
-  if (report.plans.length > 0) {
-    lines.push('')
-    lines.push('计划：')
-    for (const item of report.plans) {
-      const scope = item.scope ?? '任务范围无效'
-      const priority = item.priority === null ? '' : `｜${item.priority}`
-      const todos = item.kind === 'goal' ? `｜关联 ToDo ${item.todos}` : `｜进度 ${item.progress}`
-      lines.push(
-        `  ${item.code} [${item.archived ? '归档' : '进行中'}] ${item.kind}${priority}｜${scope}｜完成预期 ${item.expected}${todos}`,
-      )
-    }
-  }
   if (report.modules.length > 0) {
     lines.push('')
     lines.push('模块：')
@@ -531,11 +636,13 @@ function formatReport(report) {
       lines.push(`  ${item.code ?? '编码无效'}｜子模块 ${item.submodules.length}`)
     }
   }
-  if (report.issues.all.length > 0) {
+  if (report.hints.length > 0) {
     lines.push('')
-    lines.push('问题：')
-    for (const item of report.issues.all) {
-      lines.push(`  ${item.code ?? '编码无效'} [${item.status ?? '状态无效'}]`)
+    lines.push('提示：')
+    for (const hint of report.hints) {
+      lines.push(
+        `  ${hint.path}｜${(hint.bytes / 1024).toFixed(1)} KB（阈值 ${(hint.threshold / 1024).toFixed(1)} KB）｜建议拆分`,
+      )
     }
   }
   if (report.diagnostics.length > 0) {
@@ -590,6 +697,32 @@ export async function inspectDocs({ root }) {
     } else {
       docsRootExists = true
       discovered = await walk(docsRoot, docsRoot)
+    }
+  }
+
+  let largeCodeFileBytes = DEFAULT_LARGE_CODE_FILE_BYTES
+  if (docsRootExists) {
+    const manifestDoc = `${DOCS_DIR}/${MANIFEST_DOC}`
+    const manifestAbsolute = path.join(docsRoot, MANIFEST_DOC)
+    let manifestText = null
+    try {
+      manifestText = await fs.readFile(manifestAbsolute, 'utf8')
+    } catch (error) {
+      if (!error || error.code !== 'ENOENT') {
+        diagnostics.push(
+          diagnostic(
+            manifestDoc,
+            1,
+            'doc.unreadable',
+            `无法读取文件：${error instanceof Error ? error.message : String(error)}`,
+          ),
+        )
+      }
+    }
+    if (manifestText !== null) {
+      const parsed = parseManifest(manifestText)
+      diagnostics.push(...parsed.diagnostics)
+      largeCodeFileBytes = parsed.threshold
     }
   }
 
@@ -787,6 +920,8 @@ export async function inspectDocs({ root }) {
     }
   }
 
+  const hints = await collectLargeFileHints(absoluteRoot, await ensureProjectFiles(), largeCodeFileBytes)
+
   let lock = hasLock
     ? {
         present: true,
@@ -868,6 +1003,7 @@ export async function inspectDocs({ root }) {
     issues: issues.all.length,
     openIssues: issues.open.length,
     closedIssues: issues.close.length,
+    hints: hints.length,
     locked: lock !== null,
   }
   const ok = illegal.length === 0 && missing.length === 0 && diagnostics.length === 0
@@ -886,6 +1022,8 @@ export async function inspectDocs({ root }) {
     modules,
     moduleDocs,
     issues,
+    hints,
+    manifest: { largeCodeFileBytes },
     lock,
     summary,
   }

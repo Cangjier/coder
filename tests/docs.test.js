@@ -683,6 +683,99 @@ describe('计划条目文件', () => {
   })
 })
 
+describe('manifest 与大文件提示', () => {
+  const base = {
+    '.coder/design/file.md': '# **\n全部文件\n',
+    '.coder/design/architecture.md': ARCHITECTURE_OK,
+    '.coder/design/flow.md': FLOW_OK,
+    '.coder/design/data_structure.md': DATA_OK,
+    '.coder/design/modules.md': MODULES_EMPTY,
+    '.coder/diagnosis/error.md': '',
+    '.coder/diagnosis/warn.md': '',
+  }
+
+  it('默认 20KB 阈值提示大代码文件，且不影响 ok', async () => {
+    const big = 'export const value = 1\n'.repeat(1500)
+    const report = await inspect(
+      writeTree({
+        ...base,
+        'src/main.ts': 'export const value = 1\n',
+        'src/big.ts': big,
+      }),
+    )
+    assert.equal(report.ok, true)
+    assert.equal(report.summary.hints, 1)
+    assert.equal(report.hints[0].path, 'src/big.ts')
+    assert.equal(report.hints[0].threshold, 20480)
+    assert.equal(report.manifest.largeCodeFileBytes, 20480)
+    assert.match(report.text, /提示：/)
+    assert.match(report.text, /src\/big\.ts｜.*KB（阈值 20\.0 KB）｜建议拆分/)
+  })
+
+  it('manifest.json 可以自定义阈值，空文件使用默认值', async () => {
+    const report = await inspect(
+      writeTree({
+        ...base,
+        '.coder/manifest.json': '{"largeCodeFileBytes": 10}\n',
+        'src/main.ts': 'export const value = 1\n',
+      }),
+    )
+    assert.equal(report.ok, true)
+    assert.equal(report.manifest.largeCodeFileBytes, 10)
+    assert.equal(report.summary.hints, 1)
+    assert.match(report.text, /阈值 0\.0 KB/)
+
+    const emptyManifest = await inspect(writeTree({ ...base, '.coder/manifest.json': '' }))
+    assert.equal(emptyManifest.ok, true)
+    assert.equal(emptyManifest.manifest.largeCodeFileBytes, 20480)
+    assert.equal(emptyManifest.summary.hints, 0)
+  })
+
+  it('manifest.json 不合法、未知键与非正整数都会报诊断', async () => {
+    for (const [text, rule] of [
+      ['{', 'manifest.invalid'],
+      ['[]', 'manifest.invalid'],
+      ['{"foo": 1}', 'manifest.unknown'],
+      ['{"largeCodeFileBytes": 0}', 'manifest.value'],
+      ['{"largeCodeFileBytes": "1024"}', 'manifest.value'],
+    ]) {
+      const report = await inspect(writeTree({ ...base, '.coder/manifest.json': text }))
+      assert.equal(report.ok, false, rule)
+      assert.ok(rules(report, rule).length === 1, rule)
+    }
+  })
+
+  it('跳过依赖与产物目录，只统计代码扩展名', async () => {
+    const big = 'x'.repeat(30000)
+    const report = await inspect(
+      writeTree({
+        ...base,
+        'node_modules/pkg/a.js': big,
+        'dist/b.js': big,
+        'build/c.js': big,
+        'README.md': big,
+        'assets/data.json': big,
+      }),
+    )
+    assert.equal(report.ok, true)
+    assert.equal(report.summary.hints, 0)
+    assert.doesNotMatch(report.text, /提示：/)
+  })
+
+  it('manifest.json 是可选文档，不报缺失也不报非法', async () => {
+    const report = await inspect(
+      writeTree({
+        ...base,
+        '.coder/manifest.json': '{"largeCodeFileBytes": 20480}\n',
+      }),
+    )
+    assert.equal(report.ok, true)
+    const man = report.documents.find((document) => document.path === '.coder/manifest.json')
+    assert.equal(man.status, 'optional')
+    assert.doesNotMatch(report.text, /\[illegal\] \.coder\/manifest\.json/)
+  })
+})
+
 describe('fixed document set', () => {
   it('文档目录与预期文档是固化的', () => {
     assert.equal(DOCS_DIR, '.coder')

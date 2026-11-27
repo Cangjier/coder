@@ -238,8 +238,9 @@ describe('list 与问题文件', () => {
     assert.equal(report.summary.openIssues, 1)
     assert.equal(report.summary.closedIssues, 1)
     assert.equal(report.summary.optional, 2)
-    assert.match(report.text, /0001 \[开启\]/)
-    assert.match(report.text, /0002 \[关闭\]/)
+    assert.match(report.text, /问题 2/)
+    assert.doesNotMatch(report.text, /问题：/)
+    assert.doesNotMatch(report.text, /0001 \[开启\]/)
   })
 
   it('同一编码同时出现在 open/ 与 close/ 时报冲突', async () => {

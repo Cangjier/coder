@@ -1,6 +1,6 @@
 # 数据结构
 
-只记录跨模块传递的关键结构：诊断、诊断码、计划条目、模块条目、问题条目、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
+只记录跨模块传递的关键结构：诊断、诊断码、计划条目、模块条目、问题条目、大文件提示、manifest 配置、文档条目、检查报告，以及渲染的输入与结果。解析器内部的行、围栏等中间结构留在代码里，由 `src/markdown.js` 自己维护。
 
 ## 诊断
 
@@ -68,7 +68,7 @@ export interface DiagnosisCode {
 
 ## 计划条目
 
-计划条目文件解析出的 todo / goal 条目；`list` 用它展示编码、归档状态、范围、优先级和条目数。
+计划条目文件解析出的 todo / goal 条目；结构化结果保留完整条目，`list` 的 text 只展示数量。
 
 ```ts
 export type PlanKind = 'todo' | 'goal'
@@ -173,6 +173,26 @@ export interface IssueReport {
 }
 ```
 
+## 大文件提示
+
+`list` 对超过阈值的源码文件给出拆分提示；阈值来自可选的 `.coder/manifest.json`，默认 20KB。提示不进入诊断，也不影响 `ok`。
+
+```ts
+export interface LargeFileHint {
+  /** 项目内相对路径 */
+  path: string
+  /** 文件字节数 */
+  bytes: number
+  /** 生效的阈值（字节） */
+  threshold: number
+}
+
+export interface Manifest {
+  /** 大代码文件阈值（字节），默认 20480 */
+  largeCodeFileBytes: number
+}
+```
+
 ## 文档条目
 
 `.coder/` 下扫描到的每个文件都变成一条文档条目，预期、可选、非法和缺失共用同一种形状。
@@ -246,6 +266,8 @@ export interface Summary {
   openIssues: number
   /** 已关闭问题数 */
   closedIssues: number
+  /** 大代码文件的拆分提示数 */
+  hints: number
   /** .coder/lock.md 是否存在 */
   locked: boolean
 }
@@ -274,6 +296,10 @@ export interface Report {
   moduleDocs: ModuleDoc[]
   /** 问题文件 */
   issues: IssueReport
+  /** 大代码文件的拆分提示 */
+  hints: LargeFileHint[]
+  /** 生效的 manifest 配置 */
+  manifest: Manifest
   summary: Summary
   /** 锁的状态；未上锁时为 null */
   lock: LockReport | null
@@ -284,15 +310,13 @@ export interface Report {
 
 ## 渲染
 
-渲染接收七份预期文档、存在的计划条目、存在的模块详情与存在的成员文档的正文，输出页面路径、字节数和当前的检查状态。
+渲染接收七份预期文档、存在的模块详情与存在的成员文档的正文；计划条目与问题文件不渲染。输出页面路径、字节数和当前的检查状态。
 
 ```ts
 export interface RenderDocument {
   /** 展示用路径，例如 .coder/design/file.md 或 .coder/plan/todo/T0001.md */
   path: string
   kind: DocumentKind
-  /** 页面内唯一的锚点，计划条目标记为 plan-todo-T0001 这类形式 */
-  id: string
   /** 文档是否存在；缺失时正文为空串 */
   present: boolean
   content: string

@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题文件与成员文档由 list 校验格式和交叉引用，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题文件与成员文档由 list 校验格式和交叉引用，大代码文件由 list 给出拆分提示，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -160,12 +160,27 @@ flowchart LR
   J -- 调整 --> L[checkpoint + 新分支 + 替换 + 提交]
 ```
 
+## 局部视角：大文件提示
+只回答「list 如何提示大文件」：读取可选的 `.coder/manifest.json` 取阈值（默认 20KB），只统计源码扩展名并跳过依赖与产物目录；命中写入提示段，不改变 `ok`。
+
+```mermaid
+flowchart LR
+  A[读取 .coder/manifest.json] --> B{JSON 有效?}
+  B -- 否 --> C[报 manifest.* 诊断并使用默认值]
+  B -- 是 --> D[取 largeCodeFileBytes]
+  C --> D
+  D --> E[遍历项目源码文件]
+  E --> F{大小超过阈值?}
+  F -- 是 --> G[写入 hints 与提示段]
+  F -- 否 --> H[跳过]
+```
+
 ## 局部视角：渲染
 只回答「render 如何把文档变成 HTML」，扫描和诊断复用全局图。
 
 ```mermaid
 flowchart LR
-  A[render 调用] --> B[读取七份预期文档与计划条目]
+  A[render 调用] --> B[读取七份预期文档、模块详情与成员文档]
   B --> C[读取存在的模块详情]
   C --> D[汇总诊断]
   D --> E[生成 HTML]

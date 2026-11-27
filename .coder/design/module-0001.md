@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-文档检查从项目根目录出发，扫描 `.coder` 下的全部文件，比对预期文档与可选白名单，再把每份 Markdown 交给对应的结构检查器。诊断与计划校验是检查层里的子模块。
+文档检查从项目根目录出发，扫描 `.coder` 下的全部文件，比对预期文档与可选白名单，再把每份 Markdown 交给对应的结构检查器；同时读取可选的 manifest.json，对超过阈值的大代码文件给出拆分提示。诊断与计划校验是检查层里的子模块。
 ```mermaid
 flowchart TB
   subgraph 入口
@@ -17,6 +17,7 @@ flowchart TB
     issue["问题文档检查"]
     member["成员文档检查"]
     coverage["file.md 覆盖检查"]
+    hint["大文件提示"]
     lock["lock hash 检查"]
   end
   subgraph 汇总
@@ -29,6 +30,7 @@ flowchart TB
   expected --> module
   expected --> issue
   expected --> member
+  walk --> hint
   design --> coverage
   design --> report
   diagnosis --> report
@@ -36,6 +38,7 @@ flowchart TB
   issue --> report
   member --> report
   coverage --> report
+  hint --> report
   lock --> report
 ```
 ## 局部视角：格式分派
