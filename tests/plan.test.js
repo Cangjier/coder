@@ -16,7 +16,7 @@ import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCH
 const TODO = PLAN_TODO
 const GOAL = PLAN_GOAL
 
-const FILE_OK = `# src
+const FILE_OK = `# src/**
 源代码目录
 # tmp/**
 暂存目录

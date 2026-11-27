@@ -306,6 +306,45 @@ export function fileCoverage(text, files) {
 }
 
 /**
+ * 反向校验 file.md 的标题：具体路径必须存在，通配至少要命中一个项目文件。
+ *
+ * 具体路径（不含 `*` / `?`）不存在时报 `file.path.missing`；通配零命中只写成
+ * 提示（`kind: 'unused-glob'`），因为像 `tmp/**` 这样的条目可能描述的是还没
+ * 创建、或暂时为空的目录。
+ *
+ * @param {string} text - file.md 正文。
+ * @param {string} root - 项目根目录。
+ * @param {string[]} files - 项目文件，相对路径。
+ * @returns {Promise<{diagnostics: object[], hints: object[]}>} 诊断与提示。
+ */
+export async function fileReferences(text, root, files) {
+  const doc = `${DOCS_DIR}/${EXPECTED_DOCS[0]}`
+  const diagnostics = []
+  const hints = []
+  const analysis = analyzeMarkdown(text)
+  for (const heading of analysis.headings) {
+    if (heading.level > 2) continue
+    const raw = stripInlineCode(heading.text)
+    if (isCoderPath(raw) || pathIssue(raw) !== null) continue
+    if (/[*?]/.test(raw)) {
+      const matches = files.filter((file) => matchGlob(raw, file)).length
+      if (matches === 0) {
+        hints.push({ kind: 'unused-glob', doc, line: heading.line, path: raw })
+      }
+      continue
+    }
+    const absolute = path.join(root, ...raw.split('/'))
+    const stat = await fs.stat(absolute).catch(() => null)
+    if (stat === null) {
+      diagnostics.push(
+        diagnostic(doc, heading.line, 'file.path.missing', `file.md 描述的路径不存在：${raw}。`),
+      )
+    }
+  }
+  return { diagnostics, hints }
+}
+
+/**
  * 校验 file.md。
  *
  * @param {string} doc - 展示用文档路径。
@@ -565,7 +604,7 @@ export async function collectLargeFileHints(root, files, threshold) {
     const absolute = path.join(root, ...segments)
     const stat = await fs.stat(absolute).catch(() => null)
     if (stat === null || !stat.isFile() || stat.size <= threshold) continue
-    hints.push({ path: relative, bytes: stat.size, threshold })
+    hints.push({ kind: 'large-code', path: relative, bytes: stat.size, threshold })
   }
   hints.sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path))
   return hints
@@ -640,9 +679,15 @@ function formatReport(report) {
     lines.push('')
     lines.push('提示：')
     for (const hint of report.hints) {
-      lines.push(
-        `  ${hint.path}｜${(hint.bytes / 1024).toFixed(1)} KB（阈值 ${(hint.threshold / 1024).toFixed(1)} KB）｜建议拆分`,
-      )
+      if (hint.kind === 'unused-glob') {
+        lines.push(
+          `  ${hint.path}｜${hint.doc}:${hint.line}｜通配没有命中任何项目文件｜可能已过期，或目录还没有内容`,
+        )
+      } else {
+        lines.push(
+          `  ${hint.path}｜${(hint.bytes / 1024).toFixed(1)} KB（阈值 ${(hint.threshold / 1024).toFixed(1)} KB）｜建议拆分`,
+        )
+      }
     }
   }
   if (report.diagnostics.length > 0) {
@@ -729,6 +774,8 @@ export async function inspectDocs({ root }) {
   const expectedSet = new Set(EXPECTED_DOCS)
   const discoveredSet = new Set(discovered)
   const documents = []
+
+  const referenceHints = []
 
   for (const relative of EXPECTED_DOCS) {
     const exists = discoveredSet.has(relative)
@@ -829,7 +876,11 @@ export async function inspectDocs({ root }) {
       diagnostics.push(...validateDocument(doc, text, kind))
     }
     if (kind === 'file' && relative === EXPECTED_DOCS[0]) {
-      diagnostics.push(...fileCoverage(text, await ensureProjectFiles()))
+      const projectFiles = await ensureProjectFiles()
+      diagnostics.push(...fileCoverage(text, projectFiles))
+      const references = await fileReferences(text, absoluteRoot, projectFiles)
+      diagnostics.push(...references.diagnostics)
+      referenceHints.push(...references.hints)
     }
   }
 
@@ -920,7 +971,10 @@ export async function inspectDocs({ root }) {
     }
   }
 
-  const hints = await collectLargeFileHints(absoluteRoot, await ensureProjectFiles(), largeCodeFileBytes)
+  const hints = [
+    ...(await collectLargeFileHints(absoluteRoot, await ensureProjectFiles(), largeCodeFileBytes)),
+    ...referenceHints,
+  ]
 
   let lock = hasLock
     ? {

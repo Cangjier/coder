@@ -173,12 +173,13 @@ export interface IssueReport {
 }
 ```
 
-## 大文件提示
+## 提示
 
-`list` 对超过阈值的源码文件给出拆分提示；阈值来自可选的 `.coder/manifest.json`，默认 20KB。提示不进入诊断，也不影响 `ok`。
+`list` 的提示分两类：超过阈值的源码文件（阈值来自可选的 `.coder/manifest.json`，默认 20KB），以及 file.md 里没有命中任何项目文件的通配。提示不进入诊断，也不影响 `ok`。
 
 ```ts
 export interface LargeFileHint {
+  kind: 'large-code'
   /** 项目内相对路径 */
   path: string
   /** 文件字节数 */
@@ -186,6 +187,18 @@ export interface LargeFileHint {
   /** 生效的阈值（字节） */
   threshold: number
 }
+
+export interface UnusedGlobHint {
+  kind: 'unused-glob'
+  /** 展示用文档路径 */
+  doc: string
+  /** 通配标题所在行 */
+  line: number
+  /** 没有命中项目文件的通配 */
+  path: string
+}
+
+export type Hint = LargeFileHint | UnusedGlobHint
 
 export interface Manifest {
   /** 大代码文件阈值（字节），默认 20480 */
@@ -266,7 +279,7 @@ export interface Summary {
   openIssues: number
   /** 已关闭问题数 */
   closedIssues: number
-  /** 大代码文件的拆分提示数 */
+  /** 提示数 */
   hints: number
   /** .coder/lock.md 是否存在 */
   locked: boolean
@@ -296,8 +309,8 @@ export interface Report {
   moduleDocs: ModuleDoc[]
   /** 问题文件 */
   issues: IssueReport
-  /** 大代码文件的拆分提示 */
-  hints: LargeFileHint[]
+  /** 大文件与空通配的提示 */
+  hints: Hint[]
   /** 生效的 manifest 配置 */
   manifest: Manifest
   summary: Summary

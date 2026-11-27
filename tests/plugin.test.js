@@ -15,10 +15,8 @@ import * as plugin from '../index.js'
 import { apply, name as pluginName } from '../index.js'
 import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
-const FILE_OK = `# src
+const FILE_OK = `# src/**
 源代码目录
-## src/main.ts
-功能入口
 `
 
 const ARCHITECTURE_OK = `# 架构

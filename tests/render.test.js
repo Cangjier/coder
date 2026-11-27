@@ -12,7 +12,7 @@ import { renderDesign } from '../src/render.js'
 import { createLockTool } from '../src/tools/lock.js'
 import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
-const FILE_OK = `# src
+const FILE_OK = `# src/**
 源代码目录
 `
 

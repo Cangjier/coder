@@ -11,7 +11,7 @@ bundle 补丁：插入 id 为 coder 的 Host 插件行。
 # src
 源码目录。
 ## src/docs.js
-文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题与成员文档的确定性检查，读取 .coder/manifest.json，并汇总条目、交叉引用与大代码文件提示。
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题与成员文档的确定性检查，反向校验 file.md 引用，读取 .coder/manifest.json，并汇总条目、交叉引用与大文件提示。
 ## src/glob.js
 通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
 ## src/markdown.js
@@ -53,7 +53,7 @@ HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文
 # tests
 测试目录。
 ## tests/docs.test.js
-覆盖扫描、缺失、非法、文件覆盖、七份文档及计划条目的格式诊断，以及 manifest.json 与大文件提示。
+覆盖扫描、缺失、非法、file.md 引用与覆盖、七份文档及计划条目的格式诊断，以及 manifest.json 与大文件提示。
 ## tests/diagnosis.test.js
 覆盖诊断码格式、前缀、作用范围、通配命中、诊断方式与步骤格式。
 ## tests/plan.test.js

@@ -303,7 +303,7 @@ console.log({ recorded, current })
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文件会检查文件名编码、段落顺序、当前进度和关闭原因，并检查同一个编码是否同时出现在 open/ 与 close/。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。大代码文件不进入 diagnostics：超过 `manifest.json` 阈值（默认 20KB）的源码文件写入 `hints` 和 text 的「提示：」段，`ok` 不受影响。text 只打印计划与问题的数量，不逐条打印；结构化结果仍包含完整的 `plans` 与 `issues`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文件会检查文件名编码、段落顺序、当前进度和关闭原因，并检查同一个编码是否同时出现在 open/ 与 close/。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。反向校验 file.md 的引用：具体路径不存在报 `file.path.missing`，通配零命中只写入 `hints`（`kind: 'unused-glob'`）。大代码文件也不进入 diagnostics：超过 `manifest.json` 阈值（默认 20KB）的源码文件写入 `hints`（`kind: 'large-code'`）和 text 的「提示：」段，`ok` 不受影响。text 只打印计划与问题的数量，不逐条打印；结构化结果仍包含完整的 `plans` 与 `issues`。
 
 ### 预期文档
 
@@ -330,6 +330,8 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - 路径支持 `*`（段内任意字符）、`**`（跨段零层或多层）、`?`（段内一个字符）。
 - `tmp/**` 同时表达目录 `tmp` 和它下面的文件，不需要再写 `tmp`。
 - 除 `.coder` 及其内容外，项目里的每个文件必须至少被一个路径/通配匹配；未覆盖的文件报 `file.coverage.missing`。
+- 反向也要成立：不含 `*` / `?` 的具体路径必须真实存在，否则报 `file.path.missing`；存在即可，不区分目录和文件。
+- 通配路径（含 `*` / `?` / `**`）零命中项目文件时不报错，只写入 `hints` 与「提示：」段（`kind: 'unused-glob'`），因为 `tmp/**` 这类目录可能还没创建。
 - `.coder` 自身或它下面的路径不能出现在 file.md 中；出现报 `file.entry.coder`。
 - 同一个路径只能出现一次。
 - 每个标题后至少有一行非空说明。
@@ -458,7 +460,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `summary.codes`：解析出的诊断码数量。
 - `plans`：计划条目文件里解析出的条目，包含 `code`、`kind`、`archived`、`scope`、`priority`、`expected`、`progress`、`todos`。
 - `summary.plans`：解析出的计划条目数量。
-- `hints`：大代码文件的拆分提示，包含 `path`、`bytes`、`threshold`；`summary.hints` 是提示数量，不影响 `ok`。
+- `hints`：提示列表，`kind: 'large-code'` 含 `path`、`bytes`、`threshold`，`kind: 'unused-glob'` 含 `doc`、`line`、`path`；`summary.hints` 是提示数量，不影响 `ok`。
 - `manifest`：生效的配置，包含 `largeCodeFileBytes`。
 - `ok`：没有非法文档、没有缺失文档、也没有任何诊断时为 `true`。
 

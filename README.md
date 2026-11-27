@@ -51,7 +51,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 `.coder/lock.md` 是锁状态文件，不属于七份预期文档；`list` 会把它标为 `lock`，`render` 不渲染它。模块详情、成员文档和问题文档属于可选白名单，存在时检查、不存在不报缺失。
 
-`file.md` 的路径支持通配：`*` 匹配一个路径段内的任意字符，`**` 匹配零层或多层目录。`tmp/**` 同时表达目录 `tmp` 和它下面的文件，不需要再写 `tmp`。项目里的每个文件（`.coder` 自身除外）都必须被至少一个路径/通配覆盖。`.coder` 自身或它下面的路径不能出现在 `file.md` 中，出现会报 `file.entry.coder`。
+`file.md` 的路径支持通配：`*` 匹配一个路径段内的任意字符，`**` 匹配零层或多层目录。`tmp/**` 同时表达目录 `tmp` 和它下面的文件，不需要再写 `tmp`。项目里的每个文件（`.coder` 自身除外）都必须被至少一个路径/通配覆盖；`file.md` 的标题也要指向真实路径——具体路径不存在报 `file.path.missing`，通配零命中只写入「提示」段（`unused-glob`），不改变 `ok`。`.coder` 自身或它下面的路径不能出现在 `file.md` 中，出现会报 `file.entry.coder`。
 
 ## list
 
@@ -66,7 +66,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 7. 解析 `modules.md` 和存在的 `module-NNNN.md`：校验模块编码、说明、架构/流程/数据结构分段、子模块引用，以及索引与详情文件是否成对。
 8. 解析可选的 `issues/open/issue-NNNN.md` 与 `issues/close/issue-NNNN.md`：校验文件名编码、段落顺序、当前进度、关闭原因，以及同一编码是否同时出现在 open/ 与 close/。
 9. 解析可选的 `members/all.md` 与 `members/flow.md`：校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
-10. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`file.md` 中出现 `.coder` 会报错。
+10. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；反向校验标题引用：具体路径必须存在（否则 `file.path.missing`），通配零命中只写「提示」；`file.md` 中出现 `.coder` 会报错。
 11. 读取可选的 `.coder/manifest.json`（默认 `largeCodeFileBytes = 20480`），对超过阈值的源码文件生成拆分提示；提示写入 `hints` 与 text 的「提示：」段，不影响 `ok`。
 12. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
@@ -98,6 +98,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 - `largeCodeFileBytes` 是正整数，单位字节，默认 `20480`（20KB）。
 - 源码文件超过阈值时，`list` 在「提示：」段列出文件、大小与阈值，建议拆分；提示不进入 diagnostics，`ok` 不受影响。
+- `file.md` 里没有命中任何项目文件的通配也会写进同一段（`unused-glob`），同样不影响 `ok`。
 - JSON 不合法、顶层不是对象、出现未知键或值不是正整数时分别报 `manifest.invalid`、`manifest.unknown`、`manifest.value`。
 - `render` 不渲染 manifest.json。
 
@@ -167,6 +168,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | 问题编码 | `issues/open/` 与 `issues/close/` 下只允许 `issue-\d{4}.md`，状态由文件夹决定 |
 | 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/manifest.json`、`.coder/design/module-NNNN.md`、`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
 | 大文件提示 | 默认 `largeCodeFileBytes = 20480`；`.coder/manifest.json` 可覆盖；提示不影响 `ok` |
+| file.md 反向校验 | 具体路径必须存在；通配零命中只提示 |
 | 锁 hash | 所有 `.coder` 文件（除 lock.md）内容 sha256 拼接后再 sha256 |
 | 默认渲染输出 | `dist/.coder/design.html` |
 

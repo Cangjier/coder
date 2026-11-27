@@ -14,13 +14,11 @@ import { after, before, describe, it } from 'node:test'
 import { DOCS_DIR, EXPECTED_DOCS, fileCoverage, inspectDocs, validateDocument } from '../src/docs.js'
 import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
-const FILE_OK = `# src
+const FILE_OK = `# src/**
 源代码目录
-## src/main.ts
-功能入口
-# docs
+# docs/**
 文档目录
-# tmp
+# tmp/**
 临时文件目录
 `
 
@@ -683,6 +681,82 @@ describe('计划条目文件', () => {
   })
 })
 
+describe('file.md 反向校验', () => {
+  const docsBase = {
+    '.coder/design/architecture.md': ARCHITECTURE_OK,
+    '.coder/design/flow.md': FLOW_OK,
+    '.coder/design/data_structure.md': DATA_OK,
+    '.coder/design/modules.md': MODULES_EMPTY,
+    '.coder/diagnosis/error.md': '',
+    '.coder/diagnosis/warn.md': '',
+    'src/main.ts': 'export const value = 1\n',
+  }
+
+  it('具体路径不存在报 file.path.missing', async () => {
+    const report = await inspect(
+      writeTree({
+        ...docsBase,
+        '.coder/design/file.md': `# src
+源代码目录
+## src/main.ts
+入口
+# ghost/old.js
+已经不存在的文件
+`,
+      }),
+    )
+    assert.equal(report.ok, false)
+    assert.equal(rules(report, 'file.path.missing').length, 1)
+    assert.match(rules(report, 'file.path.missing')[0].message, /ghost\/old\.js/)
+  })
+
+  it('具体路径存在时不报错，目录和文件都接受', async () => {
+    const report = await inspect(
+      writeTree({
+        ...docsBase,
+        '.coder/design/file.md': `# src
+源代码目录
+## src/main.ts
+入口
+`,
+      }),
+    )
+    assert.equal(report.ok, true)
+    assert.equal(rules(report, 'file.path.missing').length, 0)
+  })
+
+  it('通配没有命中项目文件时只给提示，不影响 ok', async () => {
+    const report = await inspect(
+      writeTree({
+        ...docsBase,
+        '.coder/design/file.md': `# src/**
+源代码目录
+# legacy/**
+旧目录
+`,
+      }),
+    )
+    assert.equal(report.ok, true)
+    assert.equal(report.summary.hints, 1)
+    assert.equal(report.hints[0].kind, 'unused-glob')
+    assert.equal(report.hints[0].path, 'legacy/**')
+    assert.match(report.text, /legacy\/\*\*｜\.coder\/design\/file\.md:3｜通配没有命中任何项目文件/)
+  })
+
+  it('命中项目文件的通配不产生提示', async () => {
+    const report = await inspect(
+      writeTree({
+        ...docsBase,
+        '.coder/design/file.md': `# src/**
+源代码目录
+`,
+      }),
+    )
+    assert.equal(report.ok, true)
+    assert.equal(report.summary.hints, 0)
+  })
+})
+
 describe('manifest 与大文件提示', () => {
   const base = {
     '.coder/design/file.md': '# **\n全部文件\n',
@@ -725,7 +799,7 @@ describe('manifest 与大文件提示', () => {
     assert.equal(report.summary.hints, 1)
     assert.match(report.text, /阈值 0\.0 KB/)
 
-    const emptyManifest = await inspect(writeTree({ ...base, '.coder/manifest.json': '' }))
+    const emptyManifest = await inspect(writeTree({ ...base, 'src/main.ts': 'x', '.coder/manifest.json': '' }))
     assert.equal(emptyManifest.ok, true)
     assert.equal(emptyManifest.manifest.largeCodeFileBytes, 20480)
     assert.equal(emptyManifest.summary.hints, 0)

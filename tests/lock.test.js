@@ -13,7 +13,7 @@ import { LOCK_DECLARATION, LOCK_HASH_PREFIX } from '../src/lock.js'
 import { createLockTool, createUnlockTool } from '../src/tools/lock.js'
 import { MODULES_EMPTY, PLAN_GOAL, PLAN_GOAL_ARCHIVED, PLAN_TODO, PLAN_TODO_ARCHIVED } from './fixtures.js'
 
-const FILE_OK = `# src
+const FILE_OK = `# src/**
 源码目录
 # tmp/**
 暂存目录
