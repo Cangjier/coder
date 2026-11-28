@@ -39,6 +39,12 @@ import {
   moduleNumber,
 } from './module.js'
 import { inspectPlan, planKindOf, planMetaOf } from './plan.js'
+import {
+  REQUIREMENT_STATUSES,
+  inspectRequirement,
+  isRequirementDoc,
+  requirementMetaOf,
+} from './requirement.js'
 
 export { analyzeMarkdown }
 
@@ -111,7 +117,7 @@ export class CoderError extends Error {
  * 目录里同名的 error.md / warn.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
- * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'log-audit'|'log-update'|'log-usage'|'log-research'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
+ * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'requirement'|'log-audit'|'log-update'|'log-usage'|'log-research'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
  */
 export function kindOf(relative) {
   if (relative === 'diagnosis/error.md') return 'diagnosis-error'
@@ -124,6 +130,7 @@ export function kindOf(relative) {
   if (issueKind !== null) return issueKind
   const logKind = logKindOf(relative)
   if (logKind !== null) return logKind
+  if (isRequirementDoc(relative)) return 'requirement'
   const memberKind = memberKindOf(relative)
   if (memberKind !== null) return memberKind
   const base = path.posix.basename(relative).toLowerCase()
@@ -147,6 +154,7 @@ export function isOptionalDoc(relative) {
     planKindOf(relative) !== null ||
     isOptionalModuleDoc(relative) ||
     isIssueDoc(relative) ||
+    isRequirementDoc(relative) ||
     isLogDoc(relative) ||
     isMemberDoc(relative)
   )
@@ -432,7 +440,7 @@ function validateFile(doc, analysis) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文档正文。
- * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'log-audit'|'log-update'|'log-usage'|'log-research'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
+ * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'requirement'|'log-audit'|'log-update'|'log-usage'|'log-research'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
  * @param {string[]} [files] - 项目文件；诊断文档用它检查文件通配范围。
  * @returns {object[]} 诊断。
  */
@@ -442,6 +450,10 @@ export function validateDocument(doc, text, kind, files) {
   }
   if (kind.startsWith('plan-')) {
     return inspectPlan(doc, text, kind).diagnostics
+  }
+  if (kind === 'requirement') {
+    const meta = requirementMetaOf(doc.slice(DOCS_DIR.length + 1).replaceAll('\\', '/'))
+    return meta === null ? [] : inspectRequirement(doc, text, meta, files).diagnostics
   }
   if (kind === 'log-audit' || kind === 'log-update' || kind === 'log-usage' || kind === 'log-research') {
     const meta = logMetaOf(doc.slice(DOCS_DIR.length + 1).replaceAll('\\', '/'))
@@ -638,7 +650,7 @@ function formatReport(report) {
   const lines = [`Coder 文档检查：${report.docsRoot}`]
   if (!report.docsRootExists) lines.push(`（${DOCS_DIR}/ 不存在。）`)
   lines.push(
-    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜可选 ${report.summary.optional}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}｜模块 ${report.summary.modules}｜问题 ${report.summary.issues}｜日志 ${report.summary.logs}${report.summary.hints > 0 ? `｜提示 ${report.summary.hints}` : ''}${report.summary.locked ? '｜已上锁' : ''}`,
+    `预期 ${report.summary.expected}｜找到 ${report.summary.found}｜可选 ${report.summary.optional}｜非法 ${report.summary.illegal}｜缺失 ${report.summary.missing}｜诊断 ${report.summary.diagnostics}｜计划 ${report.summary.plans}｜模块 ${report.summary.modules}｜问题 ${report.summary.issues}｜需求 ${report.summary.requirements}｜日志 ${report.summary.logs}${report.summary.hints > 0 ? `｜提示 ${report.summary.hints}` : ''}${report.summary.locked ? '｜已上锁' : ''}`,
   )
   if (report.illegal.length > 0) {
     lines.push('')
@@ -729,6 +741,7 @@ export async function inspectDocs({ root }) {
   const modules = []
   const moduleDocs = []
   const issues = { open: [], close: [], all: [] }
+  const requirements = { registered: [], accepted: [], developing: [], current: [], history: [], discarded: [], all: [] }
   const logs = { audit: [], update: [], usage: [], research: [], all: [] }
   let docsRootExists = false
   let discovered = []
@@ -867,6 +880,11 @@ export async function inspectDocs({ root }) {
       const entry = { ...result.entry, doc, path: doc, relative }
       if (kind === 'issue-open') issues.open.push(entry)
       else issues.close.push(entry)
+    } else if (kind === 'requirement') {
+      const meta = requirementMetaOf(relative)
+      const result = inspectRequirement(doc, text, meta, await ensureProjectFiles())
+      diagnostics.push(...result.diagnostics)
+      requirements[meta.key].push({ ...result.entry, path: doc, relative })
     } else if (kind === 'log-audit' || kind === 'log-update' || kind === 'log-usage' || kind === 'log-research') {
       const meta = logMetaOf(relative)
       const result = inspectLog(doc, text, kind, meta)
@@ -924,6 +942,27 @@ export async function inspectDocs({ root }) {
     ...issues.open.map((entry) => ({ code: entry.code, path: entry.path, status: '开启' })),
     ...issues.close.map((entry) => ({ code: entry.code, path: entry.path, status: '关闭' })),
   ]
+
+  const requirementRank = new Map(REQUIREMENT_STATUSES.map((status, index) => [status.key, index]))
+  const requirementSort = (a, b) => a.code.localeCompare(b.code) || requirementRank.get(a.key) - requirementRank.get(b.key)
+  for (const status of REQUIREMENT_STATUSES) requirements[status.key].sort(requirementSort)
+  requirements.all = REQUIREMENT_STATUSES.flatMap((status) => requirements[status.key])
+  const requirementCodes = new Map()
+  for (const entry of requirements.all) {
+    const previous = requirementCodes.get(entry.code)
+    if (previous === undefined) {
+      requirementCodes.set(entry.code, entry)
+    } else if (previous.key !== entry.key) {
+      diagnostics.push(
+        diagnostic(
+          entry.doc,
+          entry.line,
+          'requirement.status.conflict',
+          `${entry.code} 同时出现在 ${previous.doc} 与 ${entry.doc}；一个需求只能放在一个状态目录里。`,
+        ),
+      )
+    }
+  }
 
   const logSort = (a, b) => a.date.localeCompare(b.date) || a.sequence.localeCompare(b.sequence)
   for (const kind of ['audit', 'update', 'usage', 'research']) {
@@ -1098,6 +1137,13 @@ export async function inspectDocs({ root }) {
     issues: issues.all.length,
     openIssues: issues.open.length,
     closedIssues: issues.close.length,
+    requirements: requirements.all.length,
+    registeredRequirements: requirements.registered.length,
+    acceptedRequirements: requirements.accepted.length,
+    developingRequirements: requirements.developing.length,
+    currentRequirements: requirements.current.length,
+    historyRequirements: requirements.history.length,
+    discardedRequirements: requirements.discarded.length,
     logs: logs.all.length,
     auditLogs: logs.audit.length,
     updateLogs: logs.update.length,
@@ -1122,6 +1168,7 @@ export async function inspectDocs({ root }) {
     modules,
     moduleDocs,
     issues,
+    requirements,
     logs,
     hints,
     manifest: { largeCodeFileBytes },

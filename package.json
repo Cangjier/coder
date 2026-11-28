@@ -2,7 +2,7 @@
   "name": "coder",
   "version": "0.1.0",
   "private": true,
-  "description": "Coder keeps a project's .coder/ design, diagnosis, plan, module, member, issue, and log documents honest: list reports illegal, missing, and malformed documents, checks diagnosis-code scopes, plan codes, module indexes, member rosters, issue files, and date-numbered audit/update/usage/research logs, and verifies the lock hash; lock/unlock manage the lock; update replaces any .coder document through the review flow; create_issue creates numbered issues; render turns the documents into a design.html page with Mermaid diagrams.",
+  "description": "Coder keeps a project's .coder/ design, diagnosis, plan, module, member, issue, and log documents honest: list reports illegal, missing, and malformed documents, checks diagnosis-code scopes, plan codes, module indexes, member rosters, issue files, requirement files, and date-numbered audit/update/usage/research logs, and verifies the lock hash; lock/unlock manage the lock; update replaces any .coder document through the review flow; create_issue creates numbered issues; create_requirement creates numbered requirements; render turns the documents into a design.html page with Mermaid diagrams.",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -31,6 +31,6 @@
   },
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
-    "check": "node --check index.js && node --check src/docs.js && node --check src/design.js && node --check src/diagnosis.js && node --check src/issue.js && node --check src/log.js && node --check src/module.js && node --check src/member.js && node --check src/plan.js && node --check src/scope.js && node --check src/markdown.js && node --check src/glob.js && node --check src/git.js && node --check src/lock.js && node --check src/render.js && node --check src/tools/list.js && node --check src/tools/lock.js && node --check src/tools/render.js && node --check src/tools/root.js && node --check src/tools/update.js && node --check src/tools/create-issue.js"
+    "check": "node --check index.js && node --check src/docs.js && node --check src/design.js && node --check src/diagnosis.js && node --check src/issue.js && node --check src/log.js && node --check src/module.js && node --check src/member.js && node --check src/plan.js && node --check src/requirement.js && node --check src/scope.js && node --check src/markdown.js && node --check src/glob.js && node --check src/git.js && node --check src/lock.js && node --check src/render.js && node --check src/tools/list.js && node --check src/tools/lock.js && node --check src/tools/render.js && node --check src/tools/root.js && node --check src/tools/update.js && node --check src/tools/create-issue.js && node --check src/tools/create-requirement.js"
   }
 }

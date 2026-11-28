@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Coder",
-    "description": "Checks a project's .coder/ design, diagnosis, plan, module, member, and issue documents: list reports missing, illegal, and malformed files, validates diagnosis-code scopes, plan file names and codes, module indexes, member rosters, and issue files, and verifies the lock hash; lock/unlock manage the lock; update replaces or deletes any .coder file through the review flow; create_issue creates numbered issues found during implementation; render turns the documents into a design.html page with Mermaid diagrams."
+    "description": "Checks a project's .coder/ design, diagnosis, plan, module, member, issue, requirement, and log documents: list reports missing, illegal, and malformed files, validates diagnosis-code scopes, plan file names and codes, module indexes, member rosters, issue files, requirement folders, and log entries, and verifies the lock hash; lock/unlock manage the lock; update replaces or deletes any .coder file through the review flow; create_issue creates numbered issues found during implementation; create_requirement creates numbered requirements, defaulting to the 登记 folder; render turns the documents into a design.html page with Mermaid diagrams."
   }
 }

@@ -1,7 +1,7 @@
 /**
  * `coder`：给 coder 文档树一个确定性入口。
  *
- * 插件注册六个工具：
+ * 插件注册七个工具：
  *
  *   list    扫描项目根目录下的 `.coder/` 文档树，罗列全部文档，标出非法和
  *           缺失的预期文档，并按 `docs/design.md` 的格式约定逐份诊断；
@@ -22,6 +22,9 @@
  *   create_issue  在 `.coder/issues/open/` 或 `.coder/issues/close/` 下新建问题
  *                 文件，状态由文件夹决定；`.coder` 上锁时拒绝直接写入。
  *
+ *   create_requirement  在 `.coder/requirements/<状态>/` 下新建需求文件，
+ *                 默认写入 `登记/`；状态由文件夹决定，上锁时拒绝直接写入。
+ *
  * 文档目录、预期文档和格式规则都是固化的，插件不接受配置。
  * 本包是纯 ESM、零运行时依赖：不 import 任何 `@deepseek-ai/*` 或第三方包，
  * 只使用 Node 内置模块。
@@ -30,6 +33,7 @@
  */
 
 import { createCreateIssueTool } from './src/tools/create-issue.js'
+import { createCreateRequirementTool } from './src/tools/create-requirement.js'
 import { createListTool } from './src/tools/list.js'
 import { createLockTool, createUnlockTool } from './src/tools/lock.js'
 import { createRenderTool } from './src/tools/render.js'
@@ -60,6 +64,7 @@ export function apply(ctx) {
         createUnlockTool(ctx.logger),
         createUpdateTool(ctx.logger),
         createCreateIssueTool(ctx.logger),
+        createCreateRequirementTool(ctx.logger),
       ]
       for (const definition of definitions) {
         try {

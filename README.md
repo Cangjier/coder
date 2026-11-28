@@ -1,6 +1,6 @@
 # Coder
 
-Coder 是一个 DSH Host 插件，提供六个确定性工具：
+Coder 是一个 DSH Host 插件，提供七个确定性工具：
 
 - `list`：检查项目的 `.coder/` 文档树和锁 hash。
 - `render`：把 `.coder/` 的设计、诊断、计划与成员文档渲染成一个 `design.html`。
@@ -8,6 +8,7 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 - `unlock`：删除 `.coder/lock.md`。
 - `update`：用 `tmp/` 下的源文件替换 `.coder` 下的文档；上锁时分两步执行。
 - `create_issue`：在实施过程中登记当前框架发现的问题，写入 `.coder/issues/`。
+- `create_requirement`：登记需求，默认写入 `.coder/requirements/登记/`，状态由目录决定。
 
 它不生成设计内容，也不调用模型：`list` 只读文档并报告状态，`render` 只把已有文档写成 HTML，`update` 只做确定性的校验、替换和 git 提交。
 
@@ -38,6 +39,12 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | `.coder/logs/update/2026-11-28-001.md` | 产品更新日志，一个条目一个文件（可选） |
 | `.coder/logs/usage/2026-11-28-001.md` | 使用报告日志，一个条目一个文件（可选） |
 | `.coder/logs/research/2026-11-28-001.md` | 竞品调研日志，一个条目一个文件（可选） |
+| `.coder/requirements/登记/requirement-0001.md` | 已登记的需求（可选） |
+| `.coder/requirements/接受-待开发/requirement-0001.md` | 已接受、等待开发的需求（可选） |
+| `.coder/requirements/开发中/requirement-0001.md` | 开发中的需求（可选） |
+| `.coder/requirements/本版本已完成/requirement-0001.md` | 本版本已完成的需求（可选） |
+| `.coder/requirements/历史已完成/requirement-0001.md` | 历史已完成的需求（可选） |
+| `.coder/requirements/丢弃/requirement-0001.md` | 已丢弃的需求（可选） |
 | `.coder/members/all.md` | 主对话与成员的身份、工作范围，成员的备注（可选） |
 | `.coder/members/flow.md` | 成员之间的工作流程（可选） |
 
@@ -51,6 +58,8 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 问题文件记录当前框架在实施过程中发现的问题：一个问题一个文件，文件名是 `issue-NNNN.md`，状态由文件夹决定——开启的问题放 `issues/open/`，关闭的问题放 `issues/close/`。文件里按 `# 问题`、可选的 `# 复现` 与 `# 建议`、`# 提交源`、`# 当前进度`（开启）或 `# 关闭原因`（关闭）写正文；不再写 `# 状态`。两个文件夹都是可选的，`list` 只在文件存在时检查；同一个编码不能同时出现在 open/ 与 close/。`create_issue` 负责按最大编码加一在对应文件夹创建问题文件。
 
+需求记录产品要做什么，一个需求一个文件，状态由文件夹决定：`requirements/登记/`、`requirements/接受-待开发/`、`requirements/开发中/`、`requirements/本版本已完成/`、`requirements/历史已完成/`、`requirements/丢弃/`。文件名是 `requirement-NNNN.md`，数字固定 4 位。文件里按 `# 需求`、可选的 `# 背景`、`# 验收标准`（`1. ...` 连续编号）、`# 提交源`、结尾段落写正文：还没结束的需求写 `# 当前进度`（`[文件通配] 当前进度为 ...`），本版本已完成与历史已完成写 `# 完成说明`，丢弃写 `# 丢弃原因`；不写 `# 状态`。六个目录都是可选的，同一个编码不能同时出现在两个目录里。`create_requirement` 按六个目录的最大编码加一创建需求，默认写入 `登记/`。状态流转就是移动文件：用 `update` 在目标目录写入、再删除旧目录里的文件，编号不变。
+
 日志分四类，各自一个目录：`logs/audit/` 是审计日志，`logs/update/` 是产品更新日志，`logs/usage/` 是业务使用报告日志，`logs/research/` 是竞品调研日志。文件名为 `YYYY-MM-DD-NNN.md`，日期必须真实存在，序号三位，同一目录同一天从 `001` 开始连续。文件里只有一个与文件名一致的标题 `# YYYY-MM-DD-NNN`，字段写在标题后面：审计日志写 `审计范围` 与 `审计结论`，产品更新日志写 `版本` 与 `更新内容`（连续编号条目），使用报告日志写 `使用场景` 与 `使用反馈`，竞品调研日志写 `竞品` 与 `调研结论`；四类都可以在最后写可选的 `说明`。字段顺序固定、必填值不能为空。日志是可选的，没有日志文件不报缺失；`render` 不渲染日志。
 
 成员文档记录协作关系：`members/all.md` 先写 `# 主对话` 的 `身份` 与 `工作范围`，再用 `# 成员1`、`# 成员2` 等一级标题写每个成员的 `工作区名称`、`身份`、`工作范围`，以及可选的 `备注`（写在最后，用来记录部署方式、SSH 用户等补充信息）；字段顺序固定、值不能为空，成员编号在同一份文档里不能重复。成员可以为零，只有 `# 主对话` 也是合法状态。`members/flow.md` 用 `## 场景` 加非空 `mermaid` 图讲解成员之间的工作流程，规则与 `design/flow.md` 相同。两个文件都是可选的，`list` 只在存在时检查。
@@ -61,23 +70,24 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 
 ## list
 
-`list` 每次调用做十三件事：
+`list` 每次调用做十四件事：
 
 1. 罗列 `.coder/` 下的所有文档，`lock.md` 标为 `lock`。
-2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`logs/audit/YYYY-MM-DD-NNN.md`、`logs/update/YYYY-MM-DD-NNN.md`、`logs/usage/YYYY-MM-DD-NNN.md`、`logs/research/YYYY-MM-DD-NNN.md`、`members/all.md`、`members/flow.md`、`manifest.json`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
+2. 不在预期集合、也不是 `lock.md`、也不在可选白名单（`design/module-NNNN.md`、`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`requirements/登记/requirement-NNNN.md`、`requirements/接受-待开发/requirement-NNNN.md`、`requirements/开发中/requirement-NNNN.md`、`requirements/本版本已完成/requirement-NNNN.md`、`requirements/历史已完成/requirement-NNNN.md`、`requirements/丢弃/requirement-NNNN.md`、`logs/audit/YYYY-MM-DD-NNN.md`、`logs/update/YYYY-MM-DD-NNN.md`、`logs/usage/YYYY-MM-DD-NNN.md`、`logs/research/YYYY-MM-DD-NNN.md`、`members/all.md`、`members/flow.md`、`manifest.json`，以及 `plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md`、`plan/goal/archived/G####.md`）里的文档标记为**非法文档**。
 3. 列出所有**缺失**的预期文档；可选文档不存在时不报缺失。
 4. 按 [`docs/design.md`](docs/design.md) 的格式约定诊断每个存在的 Markdown 文档，返回带行号的诊断记录。
 5. 解析两份诊断文档：校验编码前缀与 4 位数字、作用范围、诊断方式、步骤格式、步骤编号、文件通配命中和日志围栏。
 6. 解析计划条目文件：校验目录与文件名编码、标题编码是否一致，字段顺序、编号条目、完成预期、当前进度、关联 ToDo，以及同一编码是否同时留在 active 与 archived。
 7. 解析 `modules.md` 和存在的 `module-NNNN.md`：校验模块编码、说明、架构/流程/数据结构分段、子模块引用，以及索引与详情文件是否成对。
 8. 解析可选的 `issues/open/issue-NNNN.md` 与 `issues/close/issue-NNNN.md`：校验文件名编码、段落顺序、当前进度、关闭原因，以及同一编码是否同时出现在 open/ 与 close/。
-9. 解析可选的 `logs/audit/`、`logs/update/`、`logs/usage/` 与 `logs/research/`：校验日期与三位序号、同一天序号连续性、标题与文件名一致、字段顺序与必填，以及更新内容的编号条目。
-10. 解析可选的 `members/all.md` 与 `members/flow.md`：校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
-11. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；反向校验标题引用：具体路径必须存在（否则 `file.path.missing`），通配零命中只写「提示」；`file.md` 中出现 `.coder` 会报错。
-12. 读取可选的 `.coder/manifest.json`（默认 `largeCodeFileBytes = 20480`），对超过阈值的源码文件生成拆分提示；提示写入 `hints` 与 text 的「提示：」段，不影响 `ok`。
-13. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
+9. 解析可选的 `requirements/登记/` 到 `requirements/丢弃/` 六个状态目录：校验段落顺序、验收标准编号、当前进度或完成说明/丢弃原因，以及同一编码是否同时出现在两个目录。
+10. 解析可选的 `logs/audit/`、`logs/update/`、`logs/usage/` 与 `logs/research/`：校验日期与三位序号、同一天序号连续性、标题与文件名一致、字段顺序与必填，以及更新内容的编号条目。
+11. 解析可选的 `members/all.md` 与 `members/flow.md`：校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
+12. 检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；反向校验标题引用：具体路径必须存在（否则 `file.path.missing`），通配零命中只写「提示」；`file.md` 中出现 `.coder` 会报错。
+13. 读取可选的 `.coder/manifest.json`（默认 `largeCodeFileBytes = 20480`），对超过阈值的源码文件生成拆分提示；提示写入 `hints` 与 text 的「提示：」段，不影响 `ok`。
+14. 存在 `lock.md` 时校验声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。
 
-诊断码的作用范围是文件通配时，以及步骤里的文件通配，都要求至少命中一个项目文件；步骤内容是自然语言，`list` 只检查格式，不执行它们。text 只打印各类数量，不罗列全部文档路径，只额外列出非法与缺失文档的路径；结构化结果仍包含完整的 `documents`、`plans`、`issues` 与 `logs`。大文件提示只统计源码扩展名，跳过 `.git`、`node_modules`、`dist`、`build`、`out`、`target`、`vendor`、`coverage`、`tmp` 等目录。
+诊断码的作用范围是文件通配时，以及步骤里的文件通配，都要求至少命中一个项目文件；步骤内容是自然语言，`list` 只检查格式，不执行它们。text 只打印各类数量，不罗列全部文档路径，只额外列出非法与缺失文档的路径；结构化结果仍包含完整的 `documents`、`plans`、`issues`、`requirements` 与 `logs`。大文件提示只统计源码扩展名，跳过 `.git`、`node_modules`、`dist`、`build`、`out`、`target`、`vendor`、`coverage`、`tmp` 等目录。
 
 ```json
 { "root": "/path/to/project" }
@@ -173,8 +183,9 @@ Coder 是一个 DSH Host 插件，提供六个确定性工具：
 | 计划编码 | `plan/todo/` 与 `plan/todo/archived/` 只允许 `T\d{4}.md`，`plan/goal/` 与 `plan/goal/archived/` 只允许 `G\d{4}.md`；文件名必须与标题一致 |
 | 模块编码 | `modules.md`、`module-NNNN.md` 与子模块只允许 `\d{4}` |
 | 问题编码 | `issues/open/` 与 `issues/close/` 下只允许 `issue-\d{4}.md`，状态由文件夹决定 |
+| 需求编码 | `requirements/` 下六个状态目录只允许 `requirement-\d{4}.md`，状态由文件夹决定 |
 | 日志命名 | `logs/audit/`、`logs/update/`、`logs/usage/`、`logs/research/` 下只允许 `\d{4}-\d{2}-\d{2}-\d{3}.md`，日期必须真实，同一天序号从 `001` 连续 |
-| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/manifest.json`、`.coder/design/module-NNNN.md`、`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/logs/research/YYYY-MM-DD-NNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
+| 非预期白名单 | `.coder/lock.md`（状态 `lock`）、`.coder/manifest.json`、`.coder/design/module-NNNN.md`、`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/requirements/登记/requirement-NNNN.md`、`.coder/requirements/接受-待开发/requirement-NNNN.md`、`.coder/requirements/开发中/requirement-NNNN.md`、`.coder/requirements/本版本已完成/requirement-NNNN.md`、`.coder/requirements/历史已完成/requirement-NNNN.md`、`.coder/requirements/丢弃/requirement-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/logs/research/YYYY-MM-DD-NNN.md`、`.coder/members/all.md`、`.coder/members/flow.md`、`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md`、`.coder/plan/goal/archived/G####.md`（计划条目可选，路径不合法时是非法文档） |
 | 大文件提示 | 默认 `largeCodeFileBytes = 20480`；`.coder/manifest.json` 可覆盖；提示不影响 `ok` |
 | file.md 反向校验 | 具体路径必须存在；通配零命中只提示 |
 | 锁 hash | 所有 `.coder` 文件（除 lock.md）内容 sha256 拼接后再 sha256 |
@@ -189,4 +200,20 @@ npm test
 npm run check
 ```
 
-插件是纯 ESM、零运行时依赖，只使用 Node 内置模块。`list` 的扫描与校验逻辑在 `src/docs.js`，设计文档结构检查在 `src/design.js`，模块索引与详情在 `src/module.js`，问题文档在 `src/issue.js`，日志文件在 `src/log.js`，成员文档在 `src/member.js`，诊断文档解析在 `src/diagnosis.js`，计划条目解析在 `src/plan.js`，作用范围校验在 `src/scope.js`，Markdown 结构扫描在 `src/markdown.js`，锁格式与 hash 在 `src/lock.js`，HTML 生成在 `src/render.js`，git 操作在 `src/git.js`，工具定义在 `src/tools/`。
+插件是纯 ESM、零运行时依赖，只使用 Node 内置模块。`list` 的扫描与校验逻辑在 `src/docs.js`，设计文档结构检查在 `src/design.js`，模块索引与详情在 `src/module.js`，问题文档在 `src/issue.js`，需求文件在 `src/requirement.js`，日志文件在 `src/log.js`，成员文档在 `src/member.js`，诊断文档解析在 `src/diagnosis.js`，计划条目解析在 `src/plan.js`，作用范围校验在 `src/scope.js`，Markdown 结构扫描在 `src/markdown.js`，锁格式与 hash 在 `src/lock.js`，HTML 生成在 `src/render.js`，git 操作在 `src/git.js`，工具定义在 `src/tools/`。
+
+## create_requirement
+
+```json
+{
+  "root": "/path/to/project",
+  "requirement": "支持需求登记与状态流转",
+  "source": "用户",
+  "acceptance": ["能在登记目录创建需求", "能按文件夹区分状态"],
+  "status": "登记"
+}
+```
+
+`create_requirement` 按六个状态目录（`登记`、`接受-待开发`、`开发中`、`本版本已完成`、`历史已完成`、`丢弃`）里的最大编码加一创建 `requirement-NNNN.md`，默认写入 `登记/`。`acceptance` 必填，写入 `# 验收标准` 的连续编号条目；`background` 可选，写入 `# 背景`。还没结束的需求用 `scope` / `progress` 生成 `# 当前进度`；`本版本已完成` 与 `历史已完成` 用 `completion` 生成 `# 完成说明`；`丢弃` 用 `discardReason` 生成 `# 丢弃原因`。状态由文件夹决定，文件里不写 `# 状态`。
+
+生成的内容先自检，自检不过不落盘。`.coder` 已上锁时拒绝直接写入，需求文档需要通过 unlock 或 update 流程变更。工具不提交 git。

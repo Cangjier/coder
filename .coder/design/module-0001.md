@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-文档检查从项目根目录出发，扫描 `.coder` 下的全部文件，比对预期文档与可选白名单，再把每份 Markdown 交给对应的结构检查器；同时读取可选的 manifest.json，对超过阈值的大代码文件给出拆分提示。诊断与计划校验、日志校验是检查层里的子模块。
+文档检查从项目根目录出发，扫描 `.coder` 下的全部文件，比对预期文档与可选白名单，再把每份 Markdown 交给对应的结构检查器；同时读取可选的 manifest.json，对超过阈值的大代码文件给出拆分提示。诊断与计划校验、需求校验与日志校验是检查层里的子模块。
 ```mermaid
 flowchart TB
   subgraph 入口
@@ -15,6 +15,7 @@ flowchart TB
     diagnosis["诊断与计划检查"]
     module["模块文档检查"]
     issue["问题文档检查"]
+    requirement["需求文件检查"]
     log["日志文件检查"]
     member["成员文档检查"]
     coverage["file.md 覆盖检查"]
@@ -37,6 +38,7 @@ flowchart TB
   diagnosis --> report
   module --> report
   issue --> report
+  requirement --> report
   log --> report
   member --> report
   coverage --> report

@@ -248,6 +248,58 @@ console.log({ recorded, current })
 - 两个目录都可以不存在：没有问题时 `list` 不报缺失；目录下不符合 `issue-NNNN.md` 命名的文件是非法文档。
 - `create_issue` 用于在实施过程中登记问题，按两个文件夹里的最大编码加一创建问题文件。
 
+## requirements/<状态>/requirement-NNNN.md
+
+需求放在六个状态目录里，目录就是状态：
+
+```md
+.coder/requirements/登记/requirement-0001.md
+.coder/requirements/接受-待开发/requirement-0001.md
+.coder/requirements/开发中/requirement-0001.md
+.coder/requirements/本版本已完成/requirement-0001.md
+.coder/requirements/历史已完成/requirement-0001.md
+.coder/requirements/丢弃/requirement-0001.md
+```
+
+一个需求一个文件，文件名是 `requirement-NNNN.md`，数字部分固定 4 位。还没结束的需求：
+
+```md
+# 需求
+支持需求登记与状态流转。
+
+# 背景
+现在需求散落在对话里。
+
+# 验收标准
+
+1. 能在登记目录创建需求。
+2. 能按文件夹区分状态。
+
+# 提交源
+用户
+
+# 当前进度
+[src/**] 当前进度为 已登记，等待处理。
+```
+
+本版本已完成与历史已完成的需求把 `# 当前进度` 换成 `# 完成说明`，丢弃的需求换成 `# 丢弃原因`：
+
+```md
+# 完成说明
+已实现并验证。
+```
+
+- `# 需求`、`# 验收标准`、`# 提交源` 和结尾段落必填；`# 背景` 可选。
+- 段落顺序固定为 `需求 → 背景 → 验收标准 → 提交源 → 当前进度 / 完成说明 / 丢弃原因`。
+- 状态由目录决定，文件里写 `# 状态` 报 `requirement.status.removed`。
+- `# 验收标准` 下面用 `1. ...` 连续编号，至少一条。
+- 还没有结束的需求（登记、接受-待开发、开发中）在 `# 当前进度` 下只写一行 `[文件通配] 当前进度为 ...`。
+- 六个目录都是可选的：没有需求文件不报缺失；同一个编码不能同时出现在两个状态目录里，否则报 `requirement.status.conflict`。
+- 状态流转就是移动文件：用 `update` 在目标状态目录写入新文件，再删除旧目录里的文件，编号不变。
+- `render` 不渲染需求。
+
+`create_requirement` 在某个状态目录创建需求，默认 `登记/`；编号取六个目录里的最大值加一。
+
 ## logs/audit、logs/update、logs/usage 与 logs/research
 
 日志记录项目运行过程中的四类事实，一个条目一个文件，目录决定类别：
@@ -374,7 +426,7 @@ console.log({ recorded, current })
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文件会检查文件名编码、段落顺序、当前进度和关闭原因，并检查同一个编码是否同时出现在 open/ 与 close/。日志文件会检查文件名里的日期与三位序号、同一天序号是否连续、标题是否与文件名一致、字段顺序与必填，以及更新内容是否为连续编号条目。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。反向校验 file.md 的引用：具体路径不存在报 `file.path.missing`，通配零命中只写入 `hints`（`kind: 'unused-glob'`）。大代码文件也不进入 diagnostics：超过 `manifest.json` 阈值（默认 20KB）的源码文件写入 `hints`（`kind: 'large-code'`）和 text 的「提示：」段，`ok` 不受影响。text 只打印各类数量，不罗列全部文档路径，只额外列出非法与缺失文档的路径；结构化结果仍包含完整的 `documents`、`plans`、`issues` 与 `logs`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文件会检查文件名编码、段落顺序、当前进度和关闭原因，并检查同一个编码是否同时出现在 open/ 与 close/。需求文件会检查所在状态目录、段落顺序、验收标准编号、当前进度或完成说明/丢弃原因，并检查同一个编码是否同时出现在两个状态目录。日志文件会检查文件名里的日期与三位序号、同一天序号是否连续、标题是否与文件名一致、字段顺序与必填，以及更新内容是否为连续编号条目。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。反向校验 file.md 的引用：具体路径不存在报 `file.path.missing`，通配零命中只写入 `hints`（`kind: 'unused-glob'`）。大代码文件也不进入 diagnostics：超过 `manifest.json` 阈值（默认 20KB）的源码文件写入 `hints`（`kind: 'large-code'`）和 text 的「提示：」段，`ok` 不受影响。text 只打印各类数量，不罗列全部文档路径，只额外列出非法与缺失文档的路径；结构化结果仍包含完整的 `documents`、`plans`、`issues`、`requirements` 与 `logs`。
 
 ### 预期文档
 
@@ -388,7 +440,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
 
-`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/logs/research/YYYY-MM-DD-NNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md` 和 `.coder/manifest.json` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
+`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/requirements/登记/requirement-NNNN.md`、`.coder/requirements/接受-待开发/requirement-NNNN.md`、`.coder/requirements/开发中/requirement-NNNN.md`、`.coder/requirements/本版本已完成/requirement-NNNN.md`、`.coder/requirements/历史已完成/requirement-NNNN.md`、`.coder/requirements/丢弃/requirement-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/logs/research/YYYY-MM-DD-NNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md` 和 `.coder/manifest.json` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
 
 ### 格式约定
 
@@ -488,6 +540,22 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - 第一个标题之前不能有正文，否则报 `issue.preamble`；空文件报 `issue.empty`。
 - 同一个编码同时出现在 `open/` 与 `close/` 报 `issue.status.conflict`。
 
+#### requirements/登记/requirement-NNNN.md 等六个状态目录
+
+- 一个需求一个文件，文件名是 `requirement-\d{4}.md`，数字部分固定 4 位；只有 `requirements/登记/`、`requirements/接受-待开发/`、`requirements/开发中/`、`requirements/本版本已完成/`、`requirements/历史已完成/`、`requirements/丢弃/` 六个目录在白名单里，其他目录或文件名是非法文档。
+- 状态由目录决定；文件里写 `# 状态` 报 `requirement.status.removed`。
+- 允许的段落与顺序：
+  - 登记 / 接受-待开发 / 开发中：`需求 / 背景 / 验收标准 / 提交源 / 当前进度`；
+  - 本版本已完成 / 历史已完成：`需求 / 背景 / 验收标准 / 提交源 / 完成说明`；
+  - 丢弃：`需求 / 背景 / 验收标准 / 提交源 / 丢弃原因`。
+- `# 需求`、`# 验收标准`、`# 提交源` 和结尾段落必填，缺少报 `requirement.section.missing`；`# 背景` 可省略，也可以写成 `# 背景（可选）`。
+- 未知段落报 `requirement.section.unknown`，重复报 `requirement.section.duplicate`，顺序错误报 `requirement.section.order`，空段落报 `requirement.section.empty`；`##` 等标题报 `requirement.heading.level`。
+- `# 验收标准` 只接受 `N. 内容` 编号条目，从 `1.` 开始连续；格式错误报 `requirement.criteria.format`，跳号报 `requirement.criteria.number`，一条都没有报 `requirement.criteria.empty`。
+- 还没结束的需求，`# 当前进度` 只写一行 `[文件通配] 当前进度为 ...`：格式错误报 `requirement.progress.format`，多行报 `requirement.progress.lines`，通配非法报 `requirement.progress.glob`，通配没有命中项目文件报 `requirement.progress.no-match`。
+- `# 完成说明` 与 `# 丢弃原因` 至少一行非空正文，空段落报 `requirement.section.empty`。
+- 第一个标题之前不能有正文，否则报 `requirement.preamble`；空文件报 `requirement.empty`。
+- 同一个编码同时出现在两个状态目录报 `requirement.status.conflict`。
+
 #### logs/audit/YYYY-MM-DD-NNN.md、logs/update/YYYY-MM-DD-NNN.md、logs/usage/YYYY-MM-DD-NNN.md 与 logs/research/YYYY-MM-DD-NNN.md
 
 - 一个条目一个文件，文件名是 `YYYY-MM-DD-NNN.md`，日期必须是真实存在的日历日期，序号固定三位数字；`logs/`、`logs/audit/`、`logs/update/`、`logs/usage/`、`logs/research/` 之外的文件不在白名单里。
@@ -540,8 +608,9 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `modules`：`modules.md` 里解析出的模块索引，包含 `code`、`line`、`description`。
 - `moduleDocs`：存在的模块详情，包含 `code`、`path`、`submodules`。
 - `issues`：`open`、`close` 两组问题文件，`all` 是两组的汇总（`code`、`path`、`status`）。
+- `requirements`：`registered`、`accepted`、`developing`、`current`、`history`、`discarded` 六组需求条目，`all` 是六组的汇总（`code`、`status`、`criteria`）。
 - `logs`：`audit`、`update`、`usage`、`research` 四组日志条目，`all` 是四组的汇总（`kind`、`date`、`sequence`）。
-- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues` / `summary.logs` / `summary.auditLogs` / `summary.updateLogs` / `summary.usageLogs` / `summary.researchLogs`：模块、模块详情、问题与日志数量。
+- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues` / `summary.logs` / `summary.auditLogs` / `summary.updateLogs` / `summary.usageLogs` / `summary.researchLogs` / `summary.requirements` / `summary.registeredRequirements` / `summary.acceptedRequirements` / `summary.developingRequirements` / `summary.currentRequirements` / `summary.historyRequirements` / `summary.discardedRequirements`：模块、模块详情、问题、日志与需求数量。
 - `summary.optional`：存在的可选文档数量。
 - `text`：只打印各类数量，不罗列全部文档路径；非法与缺失文档的路径单独列出。
 - `diagnostics`：每条诊断包含 `doc`、`line`（能定位时）、`rule` 与 `message`。
@@ -555,12 +624,12 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 
 ## render
 
-`render` 把 `.coder/` 的七份预期文档、存在的模块详情和存在的成员文档渲染成一个 `design.html`；计划条目、问题文件与日志文件不渲染。
+`render` 把 `.coder/` 的七份预期文档、存在的模块详情和存在的成员文档渲染成一个 `design.html`；计划条目、问题文件、需求文件与日志文件不渲染。
 
 - 默认输出目录：`dist/.coder/`；文件名固定 `design.html`。
 - 调用参数 `out` 可以指定另一个输出目录。
 - 页面内嵌七份预期文档、`design/module-NNNN.md` 和存在的 `members/all.md` / `members/flow.md`；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，modules.md 与模块详情渲染为 Markdown，成员文档渲染为 Markdown，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，左侧是目录。
-- 问题文件、计划条目文件与日志文件不进入渲染页面；成员文档存在时进入页面，不存在时页面不显示空区块。
+- 问题文件、计划条目文件、需求文件与日志文件不进入渲染页面；成员文档存在时进入页面，不存在时页面不显示空区块。
 - 页面不显示额外的状态或提示文案。
 - 页面在服务端预置全部被渲染文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
 - Markdown 由 marked 渲染，Mermaid 图由 mermaid 渲染，两者从 jsDelivr 加载。
@@ -642,4 +711,28 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `开启` 写 `.coder/issues/open/issue-NNNN.md`，`关闭` 写 `.coder/issues/close/issue-NNNN.md`；文件按固定段落生成，状态不进文件。
 - 生成的内容先自检，自检不过不落盘。
 - `.coder` 已上锁时拒绝写入：问题文件要么先 unlock，要么经 update 流程提交。
+- 不提交 git。
+
+## create_requirement
+
+`create_requirement` 登记一个新需求，默认写入 `登记/`。
+
+输入：
+
+- `requirement`（必填）：`# 需求` 的正文。
+- `source`（必填）：`# 提交源`，单行。
+- `status`（可选）：`登记`、`接受-待开发`、`开发中`、`本版本已完成`、`历史已完成`、`丢弃` 之一，默认 `登记`。
+- `background`（可选）：`# 背景`。
+- `acceptance`（必填）：验收标准数组，至少一条，写入 `# 验收标准` 的连续编号条目。
+- `scope`（可选）：还没结束的需求的当前进度文件通配，默认 `**`。
+- `progress`（可选）：当前进度说明，默认按状态取「已登记，等待处理。」「已接受，等待开发。」「正在开发。」。
+- `completion`（可选）：`# 完成说明`，默认「已完成。」，只用于本版本已完成与历史已完成。
+- `discardReason`（可选）：`# 丢弃原因`，默认「已丢弃。」，只用于丢弃。
+
+行为：
+
+- 扫描六个状态目录下的 `requirement-NNNN.md`，取已用编码最大值加一，从 `0001` 开始；编码固定 4 位。
+- 按状态生成固定的结尾段落；状态不进文件。
+- 生成的内容先自检，自检不过不落盘。
+- `.coder` 已上锁时拒绝写入：需求文件要么先 unlock，要么经 update 流程提交。
 - 不提交 git。

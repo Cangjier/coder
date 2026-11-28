@@ -138,7 +138,7 @@ describe('plugin wiring', () => {
   it('插件名与工具名符合设计', () => {
     assert.equal(pluginName, 'coder')
     const { tools } = mount()
-    assert.deepEqual([...tools.keys()], ['list', 'render', 'lock', 'unlock', 'update', 'create_issue'])
+    assert.deepEqual([...tools.keys()], ['list', 'render', 'lock', 'unlock', 'update', 'create_issue', 'create_requirement'])
     const definition = tools.get('list')
     assert.equal(definition.name, 'list')
     assert.equal(definition.parameters.type, 'object')
@@ -163,6 +163,19 @@ describe('plugin wiring', () => {
       'scope',
       'progress',
       'closeReason',
+    ])
+    const createRequirement = tools.get('create_requirement')
+    assert.deepEqual(Object.keys(createRequirement.parameters.properties), [
+      'root',
+      'requirement',
+      'source',
+      'status',
+      'background',
+      'acceptance',
+      'scope',
+      'progress',
+      'completion',
+      'discardReason',
     ])
   })
 

@@ -11,7 +11,7 @@ bundle 补丁：插入 id 为 coder 的 Host 插件行。
 # src
 源码目录。
 ## src/docs.js
-文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题、日志与成员文档的确定性检查，反向校验 file.md 引用，读取 .coder/manifest.json，并汇总条目、交叉引用与大文件提示。
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题、需求、日志与成员文档的确定性检查，反向校验 file.md 引用，读取 .coder/manifest.json，并汇总条目、交叉引用与大文件提示。
 ## src/glob.js
 通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
 ## src/markdown.js
@@ -28,6 +28,8 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 模块文档：解析 modules.md 与可选的 module-NNNN.md，校验模块编码、说明、架构/流程/数据结构分段与子模块引用。
 ## src/issue.js
 问题文件：解析 issues/open 与 issues/close 下的 issue-NNNN.md，校验段落顺序、当前进度与关闭原因；状态由所在文件夹决定。
+## src/requirement.js
+需求文件：解析 requirements 下登记、接受-待开发、开发中、本版本已完成、历史已完成、丢弃六个状态目录里的 requirement-NNNN.md，校验段落顺序、验收标准编号、当前进度、完成说明与丢弃原因；状态由所在目录决定。
 ## src/log.js
 日志文件：解析 logs/audit、logs/update、logs/usage 与 logs/research 下的 YYYY-MM-DD-NNN.md，校验日期、同一天序号连续性、标题与文件名一致、固定字段与更新内容的编号条目。
 ## src/member.js
@@ -37,7 +39,7 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/git.js
 update 的 git 操作：提交指定文件、checkpoint 与新建分支。
 ## src/render.js
-HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文档写成单页 design.html；计划条目、问题文件与日志文件不渲染。
+HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文档写成单页 design.html；计划条目、问题文件、需求文件与日志文件不渲染。
 # src/tools
 工具定义目录。
 ## src/tools/list.js
@@ -52,6 +54,8 @@ HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文
 `update` 工具：校验 tmp 源与 .coder 目标、上锁时分两步、替换或删除并更新 hash，按 decision 提交。
 ## src/tools/create-issue.js
 `create_issue` 工具：按最大编码加一在 issues/open 或 issues/close 下创建问题文件。
+## src/tools/create-requirement.js
+`create_requirement` 工具：按六个状态目录的最大编码加一创建需求文件，默认写入登记目录。
 # tests
 测试目录。
 ## tests/docs.test.js
@@ -64,6 +68,8 @@ HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文
 覆盖模块索引、模块详情、子模块引用、索引交叉检查与渲染收录。
 ## tests/issue.test.js
 覆盖问题文件段落、open/close 文件夹状态、当前进度与关闭原因，以及 create_issue 的编号和写入规则。
+## tests/requirement.test.js
+覆盖需求文件六个状态目录、段落顺序、验收标准编号、当前进度、完成说明与丢弃原因，以及 create_requirement 的编号和写入规则。
 ## tests/log.test.js
 覆盖三类日志的日期序号文件名、标题、固定字段、更新内容编号条目、同日序号连续性，以及 list 收录与 render 排除。
 ## tests/member.test.js

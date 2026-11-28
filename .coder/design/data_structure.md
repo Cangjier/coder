@@ -173,6 +173,56 @@ export interface IssueReport {
 }
 ```
 
+## 需求条目
+
+需求放在 `requirements/` 的六个状态目录下，一个需求一个文件；状态由目录决定，没有索引文件。
+
+```ts
+export type RequirementStatus = '登记' | '接受-待开发' | '开发中' | '本版本已完成' | '历史已完成' | '丢弃'
+
+export interface RequirementProgress {
+  line: number
+  /** 进度通配；无效时为 null */
+  scope: string | null
+  /** 进度说明 */
+  text: string
+  /** 通配命中的项目文件数；未检查时为 null */
+  matches: number | null
+}
+
+export interface RequirementEntry {
+  /** 展示用文档路径，例如 .coder/requirements/登记/requirement-0001.md */
+  doc: string
+  /** 第一个段落的行号 */
+  line: number
+  /** 文件名里的 4 位编码 */
+  code: string
+  /** 所在目录决定的状态 */
+  status: RequirementStatus
+  /** 状态目录名 */
+  folder: string
+  /** 状态在报告里的分组键 */
+  key: string
+  /** 验收标准条目数 */
+  criteria: number
+  /** 还没结束的需求的当前进度；其他状态为 null */
+  progress: RequirementProgress | null
+  /** 完成说明或丢弃原因；还没结束的需求为 null */
+  conclusion: string | null
+}
+
+export interface RequirementReport {
+  registered: RequirementEntry[]
+  accepted: RequirementEntry[]
+  developing: RequirementEntry[]
+  current: RequirementEntry[]
+  history: RequirementEntry[]
+  discarded: RequirementEntry[]
+  /** 六个状态的汇总，供 list 展示 */
+  all: RequirementEntry[]
+}
+```
+
 ## 日志条目
 
 日志放在 `logs/audit/`、`logs/update/`、`logs/usage/` 与 `logs/research/` 下，一个条目一个文件；文件名是日期序号，类别由目录决定，没有索引文件。
@@ -270,6 +320,7 @@ export type DocumentKind =
   | 'plan-goal-archived'
   | 'issue-open'
   | 'issue-close'
+  | 'requirement'
   | 'log-audit'
   | 'log-update'
   | 'log-usage'
@@ -326,6 +377,20 @@ export interface Summary {
   openIssues: number
   /** 已关闭问题数 */
   closedIssues: number
+  /** 需求文件数 */
+  requirements: number
+  /** 登记中的需求数 */
+  registeredRequirements: number
+  /** 已接受待开发的需求数 */
+  acceptedRequirements: number
+  /** 开发中的需求数 */
+  developingRequirements: number
+  /** 本版本已完成的需求数 */
+  currentRequirements: number
+  /** 历史已完成的需求数 */
+  historyRequirements: number
+  /** 已丢弃的需求数 */
+  discardedRequirements: number
   /** 日志条目数 */
   logs: number
   /** 审计日志数 */
@@ -366,6 +431,8 @@ export interface Report {
   moduleDocs: ModuleDoc[]
   /** 问题文件 */
   issues: IssueReport
+  /** 需求文件 */
+  requirements: RequirementReport
   /** 日期序号日志 */
   logs: LogReport
   /** 大文件与空通配的提示 */
