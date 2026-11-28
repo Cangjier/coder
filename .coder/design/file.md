@@ -11,7 +11,7 @@ bundle 补丁：插入 id 为 coder 的 Host 插件行。
 # src
 源码目录。
 ## src/docs.js
-文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题与成员文档的确定性检查，反向校验 file.md 引用，读取 .coder/manifest.json，并汇总条目、交叉引用与大文件提示。
+文档扫描与格式诊断：扫描 .coder/ 文档树，比对预期文档与可选文档，执行设计、诊断、计划、模块、问题、日志与成员文档的确定性检查，反向校验 file.md 引用，读取 .coder/manifest.json，并汇总条目、交叉引用与大文件提示。
 ## src/glob.js
 通配匹配：支持 *、**、? 的路径匹配与文件覆盖检查。
 ## src/markdown.js
@@ -28,6 +28,8 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 模块文档：解析 modules.md 与可选的 module-NNNN.md，校验模块编码、说明、架构/流程/数据结构分段与子模块引用。
 ## src/issue.js
 问题文件：解析 issues/open 与 issues/close 下的 issue-NNNN.md，校验段落顺序、当前进度与关闭原因；状态由所在文件夹决定。
+## src/log.js
+日志文件：解析 logs/audit、logs/update 与 logs/usage 下的 YYYY-MM-DD-NNN.md，校验日期、同一天序号连续性、标题与文件名一致、固定字段与更新内容的编号条目。
 ## src/member.js
 成员文档：解析可选的 members/all.md 与 members/flow.md，校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
 ## src/lock.js
@@ -35,7 +37,7 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/git.js
 update 的 git 操作：提交指定文件、checkpoint 与新建分支。
 ## src/render.js
-HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文档写成单页 design.html；计划条目与问题文件不渲染。
+HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文档写成单页 design.html；计划条目、问题文件与日志文件不渲染。
 # src/tools
 工具定义目录。
 ## src/tools/list.js
@@ -62,6 +64,8 @@ HTML 渲染：把七份预期文档、存在的模块详情和存在的成员文
 覆盖模块索引、模块详情、子模块引用、索引交叉检查与渲染收录。
 ## tests/issue.test.js
 覆盖问题文件段落、open/close 文件夹状态、当前进度与关闭原因，以及 create_issue 的编号和写入规则。
+## tests/log.test.js
+覆盖三类日志的日期序号文件名、标题、固定字段、更新内容编号条目、同日序号连续性，以及 list 收录与 render 排除。
 ## tests/member.test.js
 覆盖成员名册的主对话、成员编号、字段与可选备注，成员流程的场景与 Mermaid 图，以及 list/render 对成员文档的收录。
 ## tests/fixtures.js

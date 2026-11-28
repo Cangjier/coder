@@ -224,8 +224,9 @@ describe('list tool', () => {
     assert.equal(report.ok, false)
     assert.deepEqual(report.illegal, ['.coder/design/extra.md'])
     assert.deepEqual(report.missing, ['.coder/design/flow.md'])
-    assert.match(report.text, /\[illegal\] \.coder\/design\/extra\.md/)
-    assert.match(report.text, /\[missing\] \.coder\/design\/flow\.md/)
+    assert.match(report.text, /非法文档：\n  \.coder\/design\/extra\.md/)
+    assert.match(report.text, /缺失文档：\n  \.coder\/design\/flow\.md/)
+    assert.doesNotMatch(report.text, /文档：\n  \[/)
   })
 
   it('root 不存在时作为工具失败抛出', async () => {

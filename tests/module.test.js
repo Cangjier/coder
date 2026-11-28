@@ -298,7 +298,8 @@ describe('modules in list', () => {
     assert.equal(report.summary.modules, 2)
     assert.equal(report.summary.moduleFiles, 2)
     assert.equal(report.summary.optional, 2)
-    assert.match(report.text, /\[optional\] \.coder\/design\/module-0001\.md/)
+    assert.match(report.text, /可选 2/)
+    assert.doesNotMatch(report.text, /\.coder\/design\/module-0001\.md/)
   })
 
   it('索引登记但缺少详情、详情未登记、子模块缺失都会报错', async () => {

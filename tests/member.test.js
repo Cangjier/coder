@@ -388,7 +388,8 @@ describe('members in list', () => {
     const statuses = new Map(report.documents.map((document) => [document.path, document.status]))
     assert.equal(statuses.get('.coder/members/all.md'), 'optional')
     assert.equal(statuses.get('.coder/members/flow.md'), 'optional')
-    assert.match(report.text, /\[optional\] \.coder\/members\/all\.md/)
+    assert.match(report.text, /可选 2/)
+    assert.doesNotMatch(report.text, /文档：\n  \[/)
   })
 
   it('只有主对话、没有成员时也是合法可选文档', async () => {

@@ -140,7 +140,8 @@ describe('lock / unlock', () => {
     assert.deepEqual(report.illegal, [])
     assert.ok(report.documents.some((document) => document.status === 'lock'))
     assert.match(report.text, /已上锁/)
-    assert.match(report.text, /\[lock\] \.coder\/lock\.md/)
+    assert.match(report.text, /已上锁/)
+    assert.doesNotMatch(report.text, /文档：\n  \[/)
   })
 
   it('已经上锁时再次 lock 失败', async () => {

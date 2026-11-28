@@ -155,6 +155,17 @@ describe('inspectDocs', () => {
     assert.match(report.text, /所有文档齐全且格式正确/)
   })
 
+  it('text 只打印数量，不罗列文档路径', async () => {
+    const report = await inspect(writeValidTree())
+    assert.match(report.text, /预期 7｜找到 7｜可选 4/)
+    assert.doesNotMatch(report.text, /文档：/)
+    assert.doesNotMatch(report.text, /\[ok\]|\[optional\]|\[missing\]|\[illegal\]/)
+    assert.doesNotMatch(report.text, /\.coder\/plan\/todo\/T0001\.md/)
+    // 结构化结果仍然包含每份文档。
+    assert.ok(report.documents.some((document) => document.path === '.coder/plan/todo/T0001.md'))
+    assert.equal(report.documents.length, 11)
+  })
+
   it('把预期之外的文档标为非法文档', async () => {
     const report = await inspect(
       writeTree({
@@ -179,6 +190,8 @@ describe('inspectDocs', () => {
     assert.equal(statuses.get('.coder/design/extra.md'), 'illegal')
     assert.equal(statuses.get('.coder/design/notes.txt'), 'illegal')
     assert.equal(report.diagnostics.length, 0)
+    assert.match(report.text, /非法文档：\n  \.coder\/design\/extra\.md\n  \.coder\/design\/notes\.txt/)
+    assert.doesNotMatch(report.text, /\[illegal\]/)
   })
 
   it('列出缺失的预期文档', async () => {
@@ -199,6 +212,7 @@ describe('inspectDocs', () => {
     assert.deepEqual(report.missing, ['.coder/design/flow.md'])
     const missing = report.documents.find((document) => document.status === 'missing')
     assert.equal(missing.path, '.coder/design/flow.md')
+    assert.match(report.text, /缺失文档：\n  \.coder\/design\/flow\.md/)
   })
 
   it('空诊断文档表示还没有诊断码，不算缺失也不产生诊断', async () => {

@@ -1,6 +1,6 @@
 # 架构
 ## 全局视角
-从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件并反向检查标题引用，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题文件与成员文档由 list 校验格式和交叉引用，大代码文件由 list 给出拆分提示，render 复用扫描结果生成 HTML。
+从 Host 的 tools 服务到六个工具，再向下经过扫描层和诊断层；file.md 的通配覆盖项目文件并反向检查标题引用，诊断码的文件通配范围在 list 时检查命中，计划条目、模块、问题文件、日期序号日志与成员文档由 list 校验格式和交叉引用，大代码文件由 list 给出拆分提示，render 复用扫描结果生成 HTML。
 
 ```mermaid
 flowchart TB
@@ -30,6 +30,7 @@ flowchart TB
     plan["计划文档校验"]
     module["模块文档校验"]
     issueDoc["问题文件校验"]
+    logDoc["日志文件校验"]
     memberDoc["成员文档校验"]
     scope["作用范围命中"]
     lockHash["lock.md hash 校验"]
@@ -124,6 +125,19 @@ flowchart LR
   G --> H{同一编码同时在两边?}
   H -- 是 --> I[报 issue.status.conflict]
   H -- 否 --> J[记录 issues]
+```
+
+## 局部视角：日志条目
+只回答「三类日期序号日志如何被校验」：文件名里的日期与序号、同一天序号是否连续、标题是否与文件名一致、字段顺序与必填，以及更新内容是否为连续编号条目。
+
+```mermaid
+flowchart LR
+  A[读取 logs/audit、logs/update、logs/usage 下的 YYYY-MM-DD-NNN.md] --> B[校验日期与序号]
+  B --> C{同一天序号从 001 连续?}
+  C -- 否 --> D[报 log.sequence.gap]
+  C -- 是 --> E[校验标题与文件名一致]
+  E --> F[校验字段顺序、必填与更新内容编号]
+  F --> G[写入 logs]
 ```
 
 ## 局部视角：成员文档

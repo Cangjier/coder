@@ -173,6 +173,47 @@ export interface IssueReport {
 }
 ```
 
+## 日志条目
+
+日志放在 `logs/audit/`、`logs/update/` 与 `logs/usage/` 下，一个条目一个文件；文件名是日期序号，类别由目录决定，没有索引文件。
+
+```ts
+export type LogKind = 'audit' | 'update' | 'usage'
+
+export interface LogEntry {
+  /** 展示用文档路径，例如 .coder/logs/audit/2026-11-28-001.md */
+  doc: string
+  /** 标题行号 */
+  line: number
+  /** 所在目录决定的类别 */
+  kind: LogKind
+  /** 文件名里的日期，YYYY-MM-DD */
+  date: string
+  /** 文件名里的三位序号 */
+  sequence: string
+  /** 更新日志的版本；其他类别为 null */
+  version: string | null
+  /** 审计范围；其他类别为 null */
+  scope: string | null
+  /** 审计结论；其他类别为 null */
+  conclusion: string | null
+  /** 使用场景；其他类别为 null */
+  scenario: string | null
+  /** 使用反馈；其他类别为 null */
+  feedback: string | null
+  /** 更新内容的编号条目数 */
+  items: number
+}
+
+export interface LogReport {
+  audit: LogEntry[]
+  update: LogEntry[]
+  usage: LogEntry[]
+  /** 三类日志的汇总，供 list 展示 */
+  all: LogEntry[]
+}
+```
+
 ## 提示
 
 `list` 的提示分两类：超过阈值的源码文件（阈值来自可选的 `.coder/manifest.json`，默认 20KB），以及 file.md 里没有命中任何项目文件的通配。提示不进入诊断，也不影响 `ok`。
@@ -226,6 +267,9 @@ export type DocumentKind =
   | 'plan-goal-archived'
   | 'issue-open'
   | 'issue-close'
+  | 'log-audit'
+  | 'log-update'
+  | 'log-usage'
   | 'members-all'
   | 'members-flow'
   | 'lock'
@@ -279,6 +323,14 @@ export interface Summary {
   openIssues: number
   /** 已关闭问题数 */
   closedIssues: number
+  /** 日志条目数 */
+  logs: number
+  /** 审计日志数 */
+  auditLogs: number
+  /** 产品更新日志数 */
+  updateLogs: number
+  /** 使用报告日志数 */
+  usageLogs: number
   /** 提示数 */
   hints: number
   /** .coder/lock.md 是否存在 */
@@ -309,6 +361,8 @@ export interface Report {
   moduleDocs: ModuleDoc[]
   /** 问题文件 */
   issues: IssueReport
+  /** 日期序号日志 */
+  logs: LogReport
   /** 大文件与空通配的提示 */
   hints: Hint[]
   /** 生效的 manifest 配置 */
@@ -327,7 +381,7 @@ export interface Report {
 
 ```ts
 export interface RenderDocument {
-  /** 展示用路径，例如 .coder/design/file.md 或 .coder/plan/todo/T0001.md */
+  /** 展示用路径，例如 .coder/design/file.md 或 .coder/members/all.md */
   path: string
   kind: DocumentKind
   /** 文档是否存在；缺失时正文为空串 */

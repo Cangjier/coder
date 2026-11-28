@@ -248,6 +248,63 @@ console.log({ recorded, current })
 - 两个目录都可以不存在：没有问题时 `list` 不报缺失；目录下不符合 `issue-NNNN.md` 命名的文件是非法文档。
 - `create_issue` 用于在实施过程中登记问题，按两个文件夹里的最大编码加一创建问题文件。
 
+## logs/audit、logs/update 与 logs/usage
+
+日志记录项目运行过程中的三类事实，一个条目一个文件，目录决定类别：
+
+```md
+.coder/logs/audit/2026-11-28-001.md     审计日志
+.coder/logs/update/2026-11-28-001.md    产品更新日志
+.coder/logs/usage/2026-11-28-001.md     使用报告日志
+```
+
+审计日志记录一次审计的范围与结论：
+
+```md
+# 2026-11-28-001
+
+审计范围：src/**
+
+审计结论：格式与覆盖检查通过
+
+说明：本轮没有发现遗漏。
+```
+
+产品更新日志记录一次产品发布，更新内容写成连续编号条目：
+
+```md
+# 2026-11-28-001
+
+版本：0.1.0
+
+更新内容：
+
+1. 增加日志目录与检查。
+2. 更新设计文档。
+```
+
+使用报告日志记录业务对产品实际使用的反馈：
+
+```md
+# 2026-11-28-001
+
+使用场景：业务录入
+
+使用反馈：字段太多，希望合并。
+
+说明：下个版本评估。
+```
+
+- 文件名是 `YYYY-MM-DD-NNN.md`：日期必须真实存在，序号是三位数字；同一目录同一天的序号从 `001` 开始连续，缺号报 `log.sequence.gap`。
+- 文件里只有一个一级标题，写成 `# YYYY-MM-DD-NNN` 并与文件名一致；标题缺失、格式不符、出现额外标题或标题前有正文都会报错。
+- 字段写成普通行 `字段：值`，顺序固定且不能重复：
+  - 审计日志：`审计范围`、`审计结论`，可选 `说明`；
+  - 产品更新日志：`版本`、`更新内容`，可选 `说明`；
+  - 使用报告日志：`使用场景`、`使用反馈`，可选 `说明`。
+- 必填字段不能为空；`更新内容` 的值必须写成后续的 `N. ...` 条目，从 `1.` 开始连续，至少一条。
+- 三类日志都是可选的：没有日志文件不报缺失；`logs/` 下不符合命名规则的文件是非法文档。
+- `render` 不渲染日志。
+
 ## manifest.json
 
 `.coder/manifest.json` 是可选配置，空文件等同默认值。目前只支持一个键：
@@ -303,7 +360,7 @@ console.log({ recorded, current })
 
 ## list
 
-dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文件会检查文件名编码、段落顺序、当前进度和关闭原因，并检查同一个编码是否同时出现在 open/ 与 close/。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。反向校验 file.md 的引用：具体路径不存在报 `file.path.missing`，通配零命中只写入 `hints`（`kind: 'unused-glob'`）。大代码文件也不进入 diagnostics：超过 `manifest.json` 阈值（默认 20KB）的源码文件写入 `hints`（`kind: 'large-code'`）和 text 的「提示：」段，`ok` 不受影响。text 只打印计划与问题的数量，不逐条打印；结构化结果仍包含完整的 `plans` 与 `issues`。
+dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状态为 `lock`；`issues/open/issue-NNNN.md`、`issues/close/issue-NNNN.md`、`design/module-NNNN.md`、`members/all.md`、`members/flow.md`、`manifest.json` 与计划条目文件是可选文档，存在时检查内容格式，不存在不报缺失；其余不在预期集合、也不在可选白名单里的文档提示为非法文档。同时诊断每一个文档的内容格式，存在问题的，罗列诊断记录。如果缺失预期文档，将罗列所有缺失的文档。`list` 还会检查 `file.md` 是否覆盖项目里的所有文件，`.coder` 自身及其内容除外；`.coder` 自身或它下面的路径出现在 `file.md` 中会报错。`architecture.md`、`flow.md`、`data_structure.md` 和 `modules.md` 按各自的格式约定检查，`module-NNNN.md` 复用前三者的规则并检查子模块引用。`diagnosis/error.md` 和 `warn.md` 会检查诊断码前缀、4 位数字、作用范围、诊断方式、步骤格式和编号；文件通配形式的作用范围以及步骤里的文件通配必须至少命中一个项目文件。`plan/todo/T####.md`、`plan/todo/archived/T####.md`、`plan/goal/G####.md` 和 `plan/goal/archived/G####.md` 会检查文件名与标题编码、字段顺序、编号、完成预期句式、当前进度和关联 ToDo，并检查同一个编码是否同时留在 active 与 archived。问题文件会检查文件名编码、段落顺序、当前进度和关闭原因，并检查同一个编码是否同时出现在 open/ 与 close/。日志文件会检查文件名里的日期与三位序号、同一天序号是否连续、标题是否与文件名一致、字段顺序与必填，以及更新内容是否为连续编号条目。成员文档会检查 `all.md` 的主对话、`# 成员N` 编号与字段（含成员的备注），以及 `flow.md` 的场景和 Mermaid 图。存在 `lock.md` 时，`list` 会校验它的声明、hash 格式和当前 hash；hash 不一致报 `lock.hash.mismatch`。反向校验 file.md 的引用：具体路径不存在报 `file.path.missing`，通配零命中只写入 `hints`（`kind: 'unused-glob'`）。大代码文件也不进入 diagnostics：超过 `manifest.json` 阈值（默认 20KB）的源码文件写入 `hints`（`kind: 'large-code'`）和 text 的「提示：」段，`ok` 不受影响。text 只打印各类数量，不罗列全部文档路径，只额外列出非法与缺失文档的路径；结构化结果仍包含完整的 `documents`、`plans`、`issues` 与 `logs`。
 
 ### 预期文档
 
@@ -317,7 +374,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
 
-`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md` 和 `.coder/manifest.json` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
+`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md` 和 `.coder/manifest.json` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
 
 ### 格式约定
 
@@ -417,6 +474,21 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - 第一个标题之前不能有正文，否则报 `issue.preamble`；空文件报 `issue.empty`。
 - 同一个编码同时出现在 `open/` 与 `close/` 报 `issue.status.conflict`。
 
+#### logs/audit/YYYY-MM-DD-NNN.md、logs/update/YYYY-MM-DD-NNN.md 与 logs/usage/YYYY-MM-DD-NNN.md
+
+- 一个条目一个文件，文件名是 `YYYY-MM-DD-NNN.md`，日期必须是真实存在的日历日期，序号固定三位数字；`logs/`、`logs/audit/`、`logs/update/`、`logs/usage/` 之外的文件不在白名单里。
+- 同一目录同一天的序号必须从 `001` 开始连续；缺号报 `log.sequence.gap`，`000` 报 `log.file.sequence`。
+- 文件里只有一个一级标题，写成 `# YYYY-MM-DD-NNN` 并与文件名一致；没有标题报 `log.title.missing`，不一致报 `log.title.format`，额外标题报 `log.heading.extra`。
+- 第一个标题之前不能有正文，否则报 `log.preamble`；空文件报 `log.empty`。
+- 字段顺序固定且不能重复：
+  - 审计日志：`审计范围`、`审计结论`，可选 `说明`；
+  - 产品更新日志：`版本`、`更新内容`，可选 `说明`；
+  - 使用报告日志：`使用场景`、`使用反馈`，可选 `说明`。
+- 必填字段缺失报 `log.field.missing`，顺序错误报 `log.field.order`，重复报 `log.field.multiple`，未知字段报 `log.field.unexpected`，值为空报 `log.field.empty`。
+- `更新内容` 的值必须写成后续的 `N. ...` 条目，不能写在同一行（否则报 `log.field.inline`）；条目至少一条（否则报 `log.item.missing`），从 `1.` 开始连续（否则报 `log.item.number`），条目内容不能为空（否则报 `log.item.empty`）。
+- 正文只允许字段行和编号条目，其他行报 `log.body`。
+- 日志之间按类别与日期独立编号，不同类别、不同日期的序号互不影响。
+
 #### manifest.json
 
 - 文件可选；不存在或为空时使用默认配置。
@@ -453,8 +525,10 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `modules`：`modules.md` 里解析出的模块索引，包含 `code`、`line`、`description`。
 - `moduleDocs`：存在的模块详情，包含 `code`、`path`、`submodules`。
 - `issues`：`open`、`close` 两组问题文件，`all` 是两组的汇总（`code`、`path`、`status`）。
-- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues`：模块、模块详情与问题数量。
+- `logs`：`audit`、`update`、`usage` 三组日志条目，`all` 是三组的汇总（`kind`、`date`、`sequence`）。
+- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues` / `summary.logs` / `summary.auditLogs` / `summary.updateLogs` / `summary.usageLogs`：模块、模块详情、问题与日志数量。
 - `summary.optional`：存在的可选文档数量。
+- `text`：只打印各类数量，不罗列全部文档路径；非法与缺失文档的路径单独列出。
 - `diagnostics`：每条诊断包含 `doc`、`line`（能定位时）、`rule` 与 `message`。
 - `diagnoses`：两份诊断文档里解析出的诊断码，包含 `code`、`severity`、`scope`、`scopeKind`、`method`、`steps`、`matches`。
 - `summary.codes`：解析出的诊断码数量。
@@ -466,12 +540,12 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 
 ## render
 
-`render` 把 `.coder/` 的七份预期文档、存在的模块详情和存在的成员文档渲染成一个 `design.html`；计划条目与问题文件不渲染。
+`render` 把 `.coder/` 的七份预期文档、存在的模块详情和存在的成员文档渲染成一个 `design.html`；计划条目、问题文件与日志文件不渲染。
 
 - 默认输出目录：`dist/.coder/`；文件名固定 `design.html`。
 - 调用参数 `out` 可以指定另一个输出目录。
 - 页面内嵌七份预期文档、`design/module-NNNN.md` 和存在的 `members/all.md` / `members/flow.md`；file.md 渲染为可折叠的树表格，目录行可展开/收起，层级用缩进引导线；architecture.md 和 flow.md 渲染为 Markdown 与 Mermaid 图，data_structure.md 渲染为 Markdown 与 TypeScript 代码块，modules.md 与模块详情渲染为 Markdown，成员文档渲染为 Markdown，diagnosis/error.md 与 warn.md 渲染为 Markdown 诊断码目录，左侧是目录。
-- 问题文件与计划条目文件不进入渲染页面；成员文档存在时进入页面，不存在时页面不显示空区块。
+- 问题文件、计划条目文件与日志文件不进入渲染页面；成员文档存在时进入页面，不存在时页面不显示空区块。
 - 页面不显示额外的状态或提示文案。
 - 页面在服务端预置全部被渲染文档的源码；脚本不可用时保留源码作为正文，脚本可用时升级为树表格 / Markdown / Mermaid。
 - Markdown 由 marked 渲染，Mermaid 图由 mermaid 渲染，两者从 jsDelivr 加载。
