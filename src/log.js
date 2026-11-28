@@ -1,11 +1,12 @@
 /**
  * `.coder/logs/` 下日志条目的解析和确定性检查。
  *
- * 日志分三类，各自一个目录，一个条目一个文件，文件名用日期序号：
+ * 日志分四类，各自一个目录，一个条目一个文件，文件名用日期序号：
  *
  *   .coder/logs/audit/2026-11-28-001.md     审计日志
  *   .coder/logs/update/2026-11-28-001.md    产品更新日志
  *   .coder/logs/usage/2026-11-28-001.md     使用报告日志
+ *   .coder/logs/research/2026-11-28-001.md  竞品调研日志
  *
  * 文件名由 `YYYY-MM-DD` 与三位序号组成，日期必须是真实存在的日期，同一天
  * 的序号从 001 开始连续。文件里只有一个与文件名一致的一级标题，字段跟在
@@ -28,8 +29,13 @@
  *   使用场景：业务录入
  *   使用反馈：字段太多
  *
- * 三类日志共用「说明」作为可选补充字段；产品更新日志用 `版本` 与编号条目
- * `更新内容` 代替另外两类的字段。字段顺序固定，值不能为空。
+ *   # 2026-11-28-001
+ *
+ *   竞品：同类产品甲
+ *   调研结论：字段更少，导入更快
+ *
+ * 四类日志共用「说明」作为可选补充字段；产品更新日志用 `版本` 与编号条目
+ * `更新内容` 代替其他类别的字段。字段顺序固定，值不能为空。
  *
  * `list` 只做机械检查：日期是否真实、序号是否连续、标题与文件名是否一致、
  * 字段顺序与必填、编号是否连续。日志内容是否属实无法机械判断，不猜也不报。
@@ -51,8 +57,11 @@ export const LOG_UPDATE_DIR = 'logs/update'
 /** 使用报告日志目录，相对于 `.coder/`。 */
 export const LOG_USAGE_DIR = 'logs/usage'
 
-/** 日志文件：`logs/<audit|update|usage>/YYYY-MM-DD-NNN.md`。 */
-export const LOG_FILE_PATTERN = /^logs\/(audit|update|usage)\/(\d{4}-\d{2}-\d{2})-(\d{3})\.md$/
+/** 竞品调研日志目录，相对于 `.coder/`。 */
+export const LOG_RESEARCH_DIR = 'logs/research'
+
+/** 日志文件：`logs/<audit|update|usage|research>/YYYY-MM-DD-NNN.md`。 */
+export const LOG_FILE_PATTERN = /^logs\/(audit|update|usage|research)\/(\d{4}-\d{2}-\d{2})-(\d{3})\.md$/
 
 /** 每种日志的类型、标题与字段顺序。 */
 const LOG_META = Object.freeze({
@@ -74,6 +83,12 @@ const LOG_META = Object.freeze({
     fields: Object.freeze(['使用场景', '使用反馈', '说明']),
     lists: false,
   }),
+  'log-research': Object.freeze({
+    type: 'research',
+    label: '竞品调研日志',
+    fields: Object.freeze(['竞品', '调研结论', '说明']),
+    lists: false,
+  }),
 })
 
 /** 每种日志必填的字段。 */
@@ -81,6 +96,7 @@ const REQUIRED_FIELDS = Object.freeze({
   'log-audit': Object.freeze(['审计范围', '审计结论']),
   'log-update': Object.freeze(['版本', '更新内容']),
   'log-usage': Object.freeze(['使用场景', '使用反馈']),
+  'log-research': Object.freeze(['竞品', '调研结论']),
 })
 
 /** 字段行；字段名不能以空白或冒号开头。 */
@@ -126,7 +142,7 @@ export function isRealDate(value) {
  * 根据 `.coder/` 相对路径判断日志文档类型。
  *
  * @param {string} relative - 相对于 `.coder/` 的路径。
- * @returns {'log-audit'|'log-update'|'log-usage'|null} 文档类型；不是日志文件时为 null。
+ * @returns {'log-audit'|'log-update'|'log-usage'|'log-research'|null} 文档类型；不是日志文件时为 null。
  */
 export function logKindOf(relative) {
   const match = LOG_FILE_PATTERN.exec(relative)
@@ -148,7 +164,7 @@ export function isLogDoc(relative) {
  * 从日志文件路径里取日期与序号。
  *
  * @param {string} relative - 相对于 `.coder/` 的路径。
- * @returns {{kind: 'audit'|'update'|'usage', date: string, sequence: string, stem: string}|null} 元信息；不是日志文件时为 null。
+ * @returns {{kind: 'audit'|'update'|'usage'|'research', date: string, sequence: string, stem: string}|null} 元信息；不是日志文件时为 null。
  */
 export function logMetaOf(relative) {
   const match = LOG_FILE_PATTERN.exec(relative)
@@ -166,7 +182,7 @@ export function logMetaOf(relative) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文件正文。
- * @param {'log-audit'|'log-update'|'log-usage'} kind - 文档类型。
+ * @param {'log-audit'|'log-update'|'log-usage'|'log-research'} kind - 文档类型。
  * @param {{date: string, sequence: string, stem: string}} meta - 文件名给出的日期与序号。
  * @returns {{diagnostics: object[], entry: object|null}} 诊断与日志条目。
  */
@@ -339,6 +355,7 @@ export function inspectLog(doc, text, kind, meta) {
     conclusion: values.get('审计结论')?.value ?? null,
     scenario: values.get('使用场景')?.value ?? null,
     feedback: values.get('使用反馈')?.value ?? null,
+    competitor: values.get('竞品')?.value ?? null,
     items: items.get('更新内容') ?? 0,
   }
 
@@ -350,7 +367,7 @@ export function inspectLog(doc, text, kind, meta) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文件正文。
- * @param {'log-audit'|'log-update'|'log-usage'} kind - 文档类型。
+ * @param {'log-audit'|'log-update'|'log-usage'|'log-research'} kind - 文档类型。
  * @param {{date: string, sequence: string, stem: string}} meta - 文件名给出的日期与序号。
  * @returns {object[]} 诊断。
  */

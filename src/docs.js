@@ -111,7 +111,7 @@ export class CoderError extends Error {
  * 目录里同名的 error.md / warn.md 被误认。
  *
  * @param {string} relative - 相对于文档树目录的路径。
- * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'log-audit'|'log-update'|'log-usage'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
+ * @returns {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'log-audit'|'log-update'|'log-usage'|'log-research'|'members-all'|'members-flow'|'lock'|'generic'} 文档类型。
  */
 export function kindOf(relative) {
   if (relative === 'diagnosis/error.md') return 'diagnosis-error'
@@ -432,7 +432,7 @@ function validateFile(doc, analysis) {
  *
  * @param {string} doc - 展示用文档路径。
  * @param {string} text - 文档正文。
- * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'log-audit'|'log-update'|'log-usage'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
+ * @param {'file'|'architecture'|'flow'|'data'|'modules'|`module-${string}`|'diagnosis-error'|'diagnosis-warn'|'plan-todo'|'plan-todo-archived'|'plan-goal'|'plan-goal-archived'|'issue-open'|'issue-close'|'log-audit'|'log-update'|'log-usage'|'log-research'|'members-all'|'members-flow'|'lock'|'generic'} kind - 文档类型。
  * @param {string[]} [files] - 项目文件；诊断文档用它检查文件通配范围。
  * @returns {object[]} 诊断。
  */
@@ -443,7 +443,7 @@ export function validateDocument(doc, text, kind, files) {
   if (kind.startsWith('plan-')) {
     return inspectPlan(doc, text, kind).diagnostics
   }
-  if (kind === 'log-audit' || kind === 'log-update' || kind === 'log-usage') {
+  if (kind === 'log-audit' || kind === 'log-update' || kind === 'log-usage' || kind === 'log-research') {
     const meta = logMetaOf(doc.slice(DOCS_DIR.length + 1).replaceAll('\\', '/'))
     return meta === null ? [] : inspectLog(doc, text, kind, meta).diagnostics
   }
@@ -729,7 +729,7 @@ export async function inspectDocs({ root }) {
   const modules = []
   const moduleDocs = []
   const issues = { open: [], close: [], all: [] }
-  const logs = { audit: [], update: [], usage: [], all: [] }
+  const logs = { audit: [], update: [], usage: [], research: [], all: [] }
   let docsRootExists = false
   let discovered = []
   let projectFiles = null
@@ -867,7 +867,7 @@ export async function inspectDocs({ root }) {
       const entry = { ...result.entry, doc, path: doc, relative }
       if (kind === 'issue-open') issues.open.push(entry)
       else issues.close.push(entry)
-    } else if (kind === 'log-audit' || kind === 'log-update' || kind === 'log-usage') {
+    } else if (kind === 'log-audit' || kind === 'log-update' || kind === 'log-usage' || kind === 'log-research') {
       const meta = logMetaOf(relative)
       const result = inspectLog(doc, text, kind, meta)
       diagnostics.push(...result.diagnostics)
@@ -926,7 +926,7 @@ export async function inspectDocs({ root }) {
   ]
 
   const logSort = (a, b) => a.date.localeCompare(b.date) || a.sequence.localeCompare(b.sequence)
-  for (const kind of ['audit', 'update', 'usage']) {
+  for (const kind of ['audit', 'update', 'usage', 'research']) {
     logs[kind].sort(logSort)
     const byDate = new Map()
     for (const entry of logs[kind]) {
@@ -1102,6 +1102,7 @@ export async function inspectDocs({ root }) {
     auditLogs: logs.audit.length,
     updateLogs: logs.update.length,
     usageLogs: logs.usage.length,
+    researchLogs: logs.research.length,
     hints: hints.length,
     locked: lock !== null,
   }

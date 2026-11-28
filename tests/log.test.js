@@ -1,8 +1,8 @@
 /**
  * 日志文件的行为测试。
  *
- * 覆盖 logs/audit、logs/update、logs/usage 的日期序号文件名、标题、固定字段、
- * 编号条目、同日序号连续性，以及 list 的收录与 render 的排除。
+ * 覆盖 logs/audit、logs/update、logs/usage、logs/research 的日期序号文件名、
+ * 标题、固定字段、编号条目、同日序号连续性，以及 list 的收录与 render 的排除。
  */
 
 import assert from 'node:assert/strict'
@@ -70,6 +70,15 @@ const UPDATE_OK = `# 2026-11-28-001
 
 1. 增加日志目录与检查。
 2. 更新设计文档。
+`
+
+const RESEARCH_OK = `# 2026-11-28-001
+
+竞品：同类产品甲
+
+调研结论：字段更少，导入更快。
+
+说明：可在下个版本参考。
 `
 
 const USAGE_OK = `# 2026-11-28-002
@@ -144,9 +153,11 @@ describe('日志文件名', () => {
     assert.equal(isLogDoc('logs/audit/2026-11-28-001.md'), true)
     assert.equal(isLogDoc('logs/update/2026-11-28-001.md'), true)
     assert.equal(isLogDoc('logs/usage/2026-11-28-001.md'), true)
+    assert.equal(isLogDoc('logs/research/2026-11-28-001.md'), true)
     assert.equal(logKindOf('logs/audit/2026-11-28-001.md'), 'log-audit')
     assert.equal(logKindOf('logs/update/2026-11-28-001.md'), 'log-update')
     assert.equal(logKindOf('logs/usage/2026-11-28-001.md'), 'log-usage')
+    assert.equal(logKindOf('logs/research/2026-11-28-001.md'), 'log-research')
     assert.deepEqual(logMetaOf('logs/audit/2026-11-28-001.md'), {
       kind: 'audit',
       date: '2026-11-28',
@@ -204,6 +215,17 @@ describe('日志内容', () => {
     assert.equal(result.entry.items, 2)
   })
 
+  it('竞品调研日志解析出竞品与结论', () => {
+    const result = inspectLog('.coder/logs/research/2026-11-28-001.md', RESEARCH_OK, 'log-research', {
+      date: '2026-11-28',
+      sequence: '001',
+      stem: '2026-11-28-001',
+    })
+    assert.deepEqual(result.diagnostics, [])
+    assert.equal(result.entry.kind, 'research')
+    assert.equal(result.entry.competitor, '同类产品甲')
+  })
+
   it('使用报告日志解析出场景与反馈', () => {
     const result = inspectLog('.coder/logs/usage/2026-11-28-002.md', USAGE_OK, 'log-usage', {
       date: '2026-11-28',
@@ -230,6 +252,14 @@ describe('日志内容', () => {
 
   it('字段缺失、顺序错误、重复、未知与空值都会报错', () => {
     assert.ok(checkAudit(AUDIT_OK.replace('审计结论：格式与覆盖检查通过\n', '')).some((item) => item.rule === 'log.field.missing'))
+    assert.ok(
+      validateLog(
+        '.coder/logs/research/2026-11-28-001.md',
+        RESEARCH_OK.replace('调研结论：字段更少，导入更快。\n', ''),
+        'log-research',
+        { date: '2026-11-28', sequence: '001', stem: '2026-11-28-001' },
+      ).some((item) => item.rule === 'log.field.missing'),
+    )
     const reordered = AUDIT_OK.replace(
       '审计范围：src/**\n\n审计结论：格式与覆盖检查通过',
       '审计结论：格式与覆盖检查通过\n\n审计范围：src/**',
@@ -275,23 +305,26 @@ describe('日志内容', () => {
 })
 
 describe('list 与日志文件', () => {
-  it('三类日志都作为可选文档被检查并计数', async () => {
+  it('四类日志都作为可选文档被检查并计数', async () => {
     const root = writeTree({
       '.coder/logs/audit/2026-11-28-001.md': AUDIT_OK,
       '.coder/logs/update/2026-11-28-001.md': UPDATE_OK,
       '.coder/logs/usage/2026-11-28-001.md': USAGE_OK.replaceAll('2026-11-28-002', '2026-11-28-001'),
+      '.coder/logs/research/2026-11-28-001.md': RESEARCH_OK,
     })
     const report = await inspectDocs({ root })
     assert.equal(report.ok, true)
     assert.deepEqual(report.missing, [])
-    assert.equal(report.summary.logs, 3)
+    assert.equal(report.summary.logs, 4)
     assert.equal(report.summary.auditLogs, 1)
     assert.equal(report.summary.updateLogs, 1)
     assert.equal(report.summary.usageLogs, 1)
-    assert.equal(report.summary.optional, 3)
-    assert.match(report.text, /日志 3/)
+    assert.equal(report.summary.researchLogs, 1)
+    assert.equal(report.summary.optional, 4)
+    assert.match(report.text, /日志 4/)
     assert.ok(report.documents.some((item) => item.path === '.coder/logs/audit/2026-11-28-001.md' && item.status === 'optional'))
     assert.equal(report.logs.audit[0].sequence, '001')
+    assert.equal(report.logs.research[0].competitor, '同类产品甲')
   })
 
   it('同一天序号必须从 001 连续，缺号时报 log.sequence.gap', async () => {

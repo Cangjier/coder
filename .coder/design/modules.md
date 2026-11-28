@@ -8,4 +8,4 @@
 工具与渲染：`list` / `render` / `lock` / `unlock` / `update` / `create_issue` 工具与 `design.html` 生成，渲染时收录存在的模块详情与成员文档。
 
 # 0004
-日志校验：解析 logs/audit、logs/update 与 logs/usage 下的日期序号文件，校验日期与同日序号连续性、标题、固定字段与更新内容的编号条目，并把条目汇总进 logs。
+日志校验：解析 logs/audit、logs/update、logs/usage 与 logs/research 下的日期序号文件，校验日期与同日序号连续性、标题、固定字段与更新内容的编号条目，并把条目汇总进 logs。

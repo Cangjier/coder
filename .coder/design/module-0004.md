@@ -1,10 +1,10 @@
 # 架构
 ## 全局视角
-日志校验从 `logs/audit`、`logs/update` 与 `logs/usage` 读出条目文件，先按路径确定类别与日期序号，再校验内容，最后按类别与日期汇总并检查同一天序号是否连续。
+日志校验从 `logs/audit`、`logs/update`、`logs/usage` 与 `logs/research` 读出条目文件，先按路径确定类别与日期序号，再校验内容，最后按类别与日期汇总并检查同一天序号是否连续。
 ```mermaid
 flowchart TB
   subgraph 输入
-    files["logs/audit、logs/update、logs/usage"]
+    files["logs/audit、logs/update、logs/usage、logs/research"]
   end
   subgraph 解析
     meta["日期与序号"]
@@ -31,7 +31,7 @@ flowchart TD
   C -- 是 --> E[校验字段顺序与必填]
   E --> F{是更新日志?}
   F -- 是 --> G[校验更新内容编号条目]
-  F -- 否 --> H[记录审计或使用字段]
+  F -- 否 --> H[记录审计、使用或调研字段]
   G --> I[写入 logs]
   H --> I
 ```
@@ -43,7 +43,7 @@ export interface LogEntry {
   /** 展示用文档路径 */
   doc: string
   /** 所在目录决定的类别 */
-  kind: 'audit' | 'update' | 'usage'
+  kind: 'audit' | 'update' | 'usage' | 'research'
   /** 文件名里的日期 */
   date: string
   /** 文件名里的三位序号 */

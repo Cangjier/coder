@@ -128,11 +128,11 @@ flowchart LR
 ```
 
 ## 局部视角：日志条目
-只回答「三类日期序号日志如何被校验」：文件名里的日期与序号、同一天序号是否连续、标题是否与文件名一致、字段顺序与必填，以及更新内容是否为连续编号条目。
+只回答「四类日期序号日志如何被校验」：文件名里的日期与序号、同一天序号是否连续、标题是否与文件名一致、字段顺序与必填，以及更新内容是否为连续编号条目。
 
 ```mermaid
 flowchart LR
-  A[读取 logs/audit、logs/update、logs/usage 下的 YYYY-MM-DD-NNN.md] --> B[校验日期与序号]
+  A[读取 logs/audit、logs/update、logs/usage、logs/research 下的 YYYY-MM-DD-NNN.md] --> B[校验日期与序号]
   B --> C{同一天序号从 001 连续?}
   C -- 否 --> D[报 log.sequence.gap]
   C -- 是 --> E[校验标题与文件名一致]

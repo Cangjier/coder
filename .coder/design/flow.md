@@ -88,11 +88,11 @@ flowchart TD
 ```
 
 ## 检查日志文件
-日志都是可选的；存在时校验文件名里的日期与序号、同一天序号是否从 001 连续、标题是否与文件名一致、固定字段与更新内容的编号条目，再按类别写入 logs。
+日志都是可选的；存在时校验文件名里的日期与序号、同一天序号是否从 001 连续、标题是否与文件名一致、固定字段与更新内容的编号条目，再按类别写入 logs。四类目录是 audit、update、usage 与 research。
 
 ```mermaid
 flowchart TD
-  A[读取 logs/audit、logs/update、logs/usage] --> B{文件存在?}
+  A[读取 logs/audit、logs/update、logs/usage、logs/research] --> B{文件存在?}
   B -- 否 --> C[跳过]
   B -- 是 --> D[校验日期与三位序号]
   D --> E[同一天序号从 001 连续?]

@@ -2,7 +2,7 @@
   "name": "coder",
   "version": "0.1.0",
   "private": true,
-  "description": "Coder keeps a project's .coder/ design, diagnosis, plan, module, member, issue, and log documents honest: list reports illegal, missing, and malformed documents, checks diagnosis-code scopes, plan codes, module indexes, member rosters, issue files, and date-numbered audit/update/usage logs, and verifies the lock hash; lock/unlock manage the lock; update replaces any .coder document through the review flow; create_issue creates numbered issues; render turns the documents into a design.html page with Mermaid diagrams.",
+  "description": "Coder keeps a project's .coder/ design, diagnosis, plan, module, member, issue, and log documents honest: list reports illegal, missing, and malformed documents, checks diagnosis-code scopes, plan codes, module indexes, member rosters, issue files, and date-numbered audit/update/usage/research logs, and verifies the lock hash; lock/unlock manage the lock; update replaces any .coder document through the review flow; create_issue creates numbered issues; render turns the documents into a design.html page with Mermaid diagrams.",
   "type": "module",
   "license": "MIT",
   "exports": {

@@ -248,14 +248,15 @@ console.log({ recorded, current })
 - 两个目录都可以不存在：没有问题时 `list` 不报缺失；目录下不符合 `issue-NNNN.md` 命名的文件是非法文档。
 - `create_issue` 用于在实施过程中登记问题，按两个文件夹里的最大编码加一创建问题文件。
 
-## logs/audit、logs/update 与 logs/usage
+## logs/audit、logs/update、logs/usage 与 logs/research
 
-日志记录项目运行过程中的三类事实，一个条目一个文件，目录决定类别：
+日志记录项目运行过程中的四类事实，一个条目一个文件，目录决定类别：
 
 ```md
 .coder/logs/audit/2026-11-28-001.md     审计日志
 .coder/logs/update/2026-11-28-001.md    产品更新日志
 .coder/logs/usage/2026-11-28-001.md     使用报告日志
+.coder/logs/research/2026-11-28-001.md  竞品调研日志
 ```
 
 审计日志记录一次审计的范围与结论：
@@ -295,14 +296,27 @@ console.log({ recorded, current })
 说明：下个版本评估。
 ```
 
+竞品调研日志记录一次竞品调研的对象与结论：
+
+```md
+# 2026-11-28-001
+
+竞品：同类产品甲
+
+调研结论：字段更少，导入更快。
+
+说明：可在下个版本参考。
+```
+
 - 文件名是 `YYYY-MM-DD-NNN.md`：日期必须真实存在，序号是三位数字；同一目录同一天的序号从 `001` 开始连续，缺号报 `log.sequence.gap`。
 - 文件里只有一个一级标题，写成 `# YYYY-MM-DD-NNN` 并与文件名一致；标题缺失、格式不符、出现额外标题或标题前有正文都会报错。
 - 字段写成普通行 `字段：值`，顺序固定且不能重复：
   - 审计日志：`审计范围`、`审计结论`，可选 `说明`；
   - 产品更新日志：`版本`、`更新内容`，可选 `说明`；
-  - 使用报告日志：`使用场景`、`使用反馈`，可选 `说明`。
+  - 使用报告日志：`使用场景`、`使用反馈`，可选 `说明`；
+  - 竞品调研日志：`竞品`、`调研结论`，可选 `说明`。
 - 必填字段不能为空；`更新内容` 的值必须写成后续的 `N. ...` 条目，从 `1.` 开始连续，至少一条。
-- 三类日志都是可选的：没有日志文件不报缺失；`logs/` 下不符合命名规则的文件是非法文档。
+- 四类日志都是可选的：没有日志文件不报缺失；`logs/` 下不符合命名规则的文件是非法文档。
 - `render` 不渲染日志。
 
 ## manifest.json
@@ -374,7 +388,7 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 | `.coder/diagnosis/error.md` | E 开头的错误诊断码 |
 | `.coder/diagnosis/warn.md` | W 开头的警告诊断码 |
 
-`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md` 和 `.coder/manifest.json` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
+`.coder/lock.md` 状态为 `lock`，不计入预期文档，也不渲染。计划条目文件不是预期文档：`.coder/plan/todo/T####.md`、`.coder/plan/todo/archived/T####.md`、`.coder/plan/goal/G####.md` 和 `.coder/plan/goal/archived/G####.md` 属于可选白名单，存在时检查、不存在不报缺失；`plan/` 下不符合这些路径形式的文件是非法文档。`.coder/issues/open/issue-NNNN.md`、`.coder/issues/close/issue-NNNN.md`、`.coder/logs/audit/YYYY-MM-DD-NNN.md`、`.coder/logs/update/YYYY-MM-DD-NNN.md`、`.coder/logs/usage/YYYY-MM-DD-NNN.md`、`.coder/logs/research/YYYY-MM-DD-NNN.md`、`.coder/design/module-NNNN.md`、`.coder/members/all.md`、`.coder/members/flow.md` 和 `.coder/manifest.json` 是可选白名单：存在时检查内容格式，不存在不报缺失。预期文档集合是固化的，不接受配置。
 
 ### 格式约定
 
@@ -474,16 +488,17 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - 第一个标题之前不能有正文，否则报 `issue.preamble`；空文件报 `issue.empty`。
 - 同一个编码同时出现在 `open/` 与 `close/` 报 `issue.status.conflict`。
 
-#### logs/audit/YYYY-MM-DD-NNN.md、logs/update/YYYY-MM-DD-NNN.md 与 logs/usage/YYYY-MM-DD-NNN.md
+#### logs/audit/YYYY-MM-DD-NNN.md、logs/update/YYYY-MM-DD-NNN.md、logs/usage/YYYY-MM-DD-NNN.md 与 logs/research/YYYY-MM-DD-NNN.md
 
-- 一个条目一个文件，文件名是 `YYYY-MM-DD-NNN.md`，日期必须是真实存在的日历日期，序号固定三位数字；`logs/`、`logs/audit/`、`logs/update/`、`logs/usage/` 之外的文件不在白名单里。
+- 一个条目一个文件，文件名是 `YYYY-MM-DD-NNN.md`，日期必须是真实存在的日历日期，序号固定三位数字；`logs/`、`logs/audit/`、`logs/update/`、`logs/usage/`、`logs/research/` 之外的文件不在白名单里。
 - 同一目录同一天的序号必须从 `001` 开始连续；缺号报 `log.sequence.gap`，`000` 报 `log.file.sequence`。
 - 文件里只有一个一级标题，写成 `# YYYY-MM-DD-NNN` 并与文件名一致；没有标题报 `log.title.missing`，不一致报 `log.title.format`，额外标题报 `log.heading.extra`。
 - 第一个标题之前不能有正文，否则报 `log.preamble`；空文件报 `log.empty`。
 - 字段顺序固定且不能重复：
   - 审计日志：`审计范围`、`审计结论`，可选 `说明`；
   - 产品更新日志：`版本`、`更新内容`，可选 `说明`；
-  - 使用报告日志：`使用场景`、`使用反馈`，可选 `说明`。
+  - 使用报告日志：`使用场景`、`使用反馈`，可选 `说明`；
+  - 竞品调研日志：`竞品`、`调研结论`，可选 `说明`。
 - 必填字段缺失报 `log.field.missing`，顺序错误报 `log.field.order`，重复报 `log.field.multiple`，未知字段报 `log.field.unexpected`，值为空报 `log.field.empty`。
 - `更新内容` 的值必须写成后续的 `N. ...` 条目，不能写在同一行（否则报 `log.field.inline`）；条目至少一条（否则报 `log.item.missing`），从 `1.` 开始连续（否则报 `log.item.number`），条目内容不能为空（否则报 `log.item.empty`）。
 - 正文只允许字段行和编号条目，其他行报 `log.body`。
@@ -525,8 +540,8 @@ dsh 调用 `list` 时，将会罗列 `.coder/` 下所有文档。`lock.md` 状�
 - `modules`：`modules.md` 里解析出的模块索引，包含 `code`、`line`、`description`。
 - `moduleDocs`：存在的模块详情，包含 `code`、`path`、`submodules`。
 - `issues`：`open`、`close` 两组问题文件，`all` 是两组的汇总（`code`、`path`、`status`）。
-- `logs`：`audit`、`update`、`usage` 三组日志条目，`all` 是三组的汇总（`kind`、`date`、`sequence`）。
-- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues` / `summary.logs` / `summary.auditLogs` / `summary.updateLogs` / `summary.usageLogs`：模块、模块详情、问题与日志数量。
+- `logs`：`audit`、`update`、`usage`、`research` 四组日志条目，`all` 是四组的汇总（`kind`、`date`、`sequence`）。
+- `summary.modules` / `summary.moduleFiles` / `summary.issues` / `summary.openIssues` / `summary.closedIssues` / `summary.logs` / `summary.auditLogs` / `summary.updateLogs` / `summary.usageLogs` / `summary.researchLogs`：模块、模块详情、问题与日志数量。
 - `summary.optional`：存在的可选文档数量。
 - `text`：只打印各类数量，不罗列全部文档路径；非法与缺失文档的路径单独列出。
 - `diagnostics`：每条诊断包含 `doc`、`line`（能定位时）、`rule` 与 `message`。

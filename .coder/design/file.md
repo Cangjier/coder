@@ -29,7 +29,7 @@ Markdown 结构扫描：提取标题、围栏、行号和未闭合围栏。
 ## src/issue.js
 问题文件：解析 issues/open 与 issues/close 下的 issue-NNNN.md，校验段落顺序、当前进度与关闭原因；状态由所在文件夹决定。
 ## src/log.js
-日志文件：解析 logs/audit、logs/update 与 logs/usage 下的 YYYY-MM-DD-NNN.md，校验日期、同一天序号连续性、标题与文件名一致、固定字段与更新内容的编号条目。
+日志文件：解析 logs/audit、logs/update、logs/usage 与 logs/research 下的 YYYY-MM-DD-NNN.md，校验日期、同一天序号连续性、标题与文件名一致、固定字段与更新内容的编号条目。
 ## src/member.js
 成员文档：解析可选的 members/all.md 与 members/flow.md，校验主对话、成员编号、身份/工作范围/工作区名称字段与可选的成员备注，以及成员流程的场景与 Mermaid 图。
 ## src/lock.js

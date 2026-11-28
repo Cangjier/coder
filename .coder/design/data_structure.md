@@ -175,10 +175,10 @@ export interface IssueReport {
 
 ## 日志条目
 
-日志放在 `logs/audit/`、`logs/update/` 与 `logs/usage/` 下，一个条目一个文件；文件名是日期序号，类别由目录决定，没有索引文件。
+日志放在 `logs/audit/`、`logs/update/`、`logs/usage/` 与 `logs/research/` 下，一个条目一个文件；文件名是日期序号，类别由目录决定，没有索引文件。
 
 ```ts
-export type LogKind = 'audit' | 'update' | 'usage'
+export type LogKind = 'audit' | 'update' | 'usage' | 'research'
 
 export interface LogEntry {
   /** 展示用文档路径，例如 .coder/logs/audit/2026-11-28-001.md */
@@ -201,6 +201,8 @@ export interface LogEntry {
   scenario: string | null
   /** 使用反馈；其他类别为 null */
   feedback: string | null
+  /** 竞品调研的竞品；其他类别为 null */
+  competitor: string | null
   /** 更新内容的编号条目数 */
   items: number
 }
@@ -209,7 +211,8 @@ export interface LogReport {
   audit: LogEntry[]
   update: LogEntry[]
   usage: LogEntry[]
-  /** 三类日志的汇总，供 list 展示 */
+  research: LogEntry[]
+  /** 四类日志的汇总，供 list 展示 */
   all: LogEntry[]
 }
 ```
@@ -331,6 +334,8 @@ export interface Summary {
   updateLogs: number
   /** 使用报告日志数 */
   usageLogs: number
+  /** 竞品调研日志数 */
+  researchLogs: number
   /** 提示数 */
   hints: number
   /** .coder/lock.md 是否存在 */
